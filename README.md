@@ -30,11 +30,11 @@ ACHLYS - THE OUROBOROS AWAKENS
 ---
 
 
-<Write code in Achlys>
-<Compile to standalone binary IN Achlys>
-<Binary includes interpreter + code>
-<ONE file distribution>
-<No runtime, no VM, no dependencies>
+<-Write code in Achlys->
+<-Compile to standalone binary IN Achlys->
+<-Binary includes interpreter + code->
+<-ONE file distribution->
+<-No runtime, no VM, no dependencies->
 
 ---
 
@@ -42,17 +42,17 @@ ACHLYS - THE OUROBOROS AWAKENS
 Write code in Achlys → Compile with Achlys → Get standalone binary
 
 
-ouroboros.nox (written in Achlys)
-    ↓
-Reads target .nox code
-    ↓
-Embeds it into ACHLYS.c using C raw strings
-    ↓
-Compiles standalone binary with GCC
-    ↓
-Binary contains: Interpreter + Your Code
-    ↓
-Distribution: Single executable, no external files needed
+*ouroboros.nox (written in Achlys)
+ *   ↓
+*Reads target .nox code
+ *   ↓
+*Embeds it into ACHLYS.c using C raw strings
+ *   ↓
+*Compiles standalone binary with GCC
+ *   ↓
+*Binary contains: Interpreter + Your Code
+ *   ↓
+*Distribution: Single executable, no external files needed
 
 ``
 
@@ -60,25 +60,25 @@ Distribution: Single executable, no external files needed
 FEATURES:
 
 
-<Compiles to native code>
-<Has built-in sockets>
-<Creates GUI tools>
-<Distributes as single binary>
-<Uses elegant Latin syntax>
+<-Compiles to native code->
+<-Has built-in sockets->
+<-Creates GUI tools->
+<-Distributes as single binary->
+<-Uses elegant Latin syntax->
           +
-<All in ONE package>
+<-All in ONE package->
 
 
 SPECS:
 
 
-// Direct memory access (via C interop)
-// Networking built-in
-// Graphics built-in
-// System calls built-in
-// Compiles to native code
-// No garbage collection overhead
-// Full control
+*// Direct memory access (via C interop)
+*// Networking built-in
+*// Graphics built-in
+*// System calls built-in
+*// Compiles to native code
+*// No garbage collection overhead
+*// Full control
 
 
 BUILT IN:
