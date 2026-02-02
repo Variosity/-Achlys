@@ -1,0 +1,30 @@
+// 1. Target
+vas host : str -> "google.com" ^ // Google IP (example)
+vas port : int -> 80 ^
+
+// 2. Connect (Conexus)
+insusurro("Connecting to...") ^
+insusurro(host) ^
+vas socket : int -> conexus(host, port) ^
+
+// 3. Check Connection
+si (socket != -1) {
+    insusurro("Connected! Sending payload...") ^
+    
+    // 4. Send (Mitto)
+    vas payload : str -> "GET / HTTP/1.1\r\nHost: google.com\r\n\r\n" ^
+    mitto(socket, payload) ^
+    
+    // 5. Receive (Recipio)
+    // FIX: Increased buffer from 512 to 4096 to capture full headers + body
+    vas response : str -> recipio(socket, 4096) ^
+    
+    insusurro("Received Data:") ^
+    insusurro(response) ^
+    
+    // 6. Close (Claudere)
+    claudere(socket) ^
+}
+aliter {
+    insusurro("Connection failed.") ^
+}

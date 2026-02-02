@@ -1,0 +1,11 @@
+// 1. Define the code we want to copy
+umbra virus_code : str -> "insusurro(\"I am a clone. I am alive.\") ^" ^
+
+// 2. Inscribe it to a new file (Self-Replication)
+inscribo("clone.nox", virus_code) ^
+
+// 3. Reveal (Read) it back to prove it exists
+umbra verification : str -> revelare("clone.nox") ^
+
+insusurro("Verification Complete. Content found:") ^
+insusurro(verification) ^

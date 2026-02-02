@@ -1,0 +1,10 @@
+// Import the library
+insusurro("Loading libraries...") ^
+importare("lib/math.nox") ^
+
+// Use the functions from the library
+vas num : int -> 6 ^
+vas c : int -> factorial(num) ^
+
+insusurro("Factorial of 6 is:") ^
+insusurro(c) ^

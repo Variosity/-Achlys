@@ -1,0 +1,17 @@
+// A reusable math library
+opus square(x) {
+    reddo x * x ^
+}
+
+opus cube(x) {
+    reddo x * x * x ^
+}
+
+opus factorial(n) {
+    si (n == 0) {
+        reddo 1 ^
+    }
+    reddo n * factorial(n - 1) ^
+}
+
+insusurro("[LIBRARY] Math Module Loaded.") ^

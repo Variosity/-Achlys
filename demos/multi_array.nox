@@ -1,0 +1,18 @@
+// 1. Strings
+vas datastr : arr -> ["Jim", "Neo", "John", "Mary"] ^
+
+// 2. Append multiple (Merge)
+insusurro("Injecting Ana and Andres...") ^
+datastr << ["Ana", "Andres"] ^ 
+
+// 3. Verify
+insusurro(datastr[4]) ^ // Should be "Ana"
+insusurro(datastr[5]) ^ // Should be "Andres"
+
+// 4. Test Array Math (Concatenation)
+vas part1 : arr -> [1, 2] ^
+vas part2 : arr -> [3, 4] ^
+vas whole : arr -> part1 + part2 ^
+
+insusurro("Math Result:") ^
+insusurro(whole) ^

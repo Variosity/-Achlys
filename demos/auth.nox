@@ -1,0 +1,22 @@
+// 1. Prompt User
+insusurro("IDENTIFY YOURSELF:") ^
+
+// 2. Capture Input
+vas user : str -> capio() ^
+
+// 3. Logic Check
+si (user == "admin") {
+    insusurro("Welcome, Commander.") ^
+    
+    insusurro("ENTER PASSCODE:") ^
+    vas pass : str -> capio() ^
+    
+    si (pass == "369") {
+        insusurro("ACCESS GRANTED. SYSTEM UNLOCKED.") ^
+    } aliter {
+        insusurro("INCORRECT PASSCODE. TERMINATING.") ^
+    }
+} aliter {
+    insusurro("UNKNOWN USER.") ^
+    insusurro("Get out of here, " + user + "...") ^
+}

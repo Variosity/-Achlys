@@ -1,0 +1,26 @@
+// ACHLYS CYBERPUNK GUI v1.0
+// Requires Achlys with Raylib implant
+
+// 1. Initialize Window (800x600)
+fenestra(800, 600, "ACHLYS OS - TERMINAL LINK") ^
+
+// 2. Main Loop
+dum (!fenestra_claudenda()) {
+    incipere_picturam() ^
+    
+    // Clear to Black (Color 0)
+    purgare_fundum(0) ^
+    
+    // Draw Header Bar (Dark Gray)
+    delinere_quadratum(0, 0, 800, 50, 6) ^
+    
+    // Draw Title (Gold)
+    delinere_textum("ACHLYS SYSTEM // CONNECTED", 20, 15, 20, 7) ^
+    
+    // Draw Main Terminal Text (Green)
+    delinere_textum("Access granted...", 50, 100, 20, 3) ^
+    delinere_textum("Protocol: [PHASE 2]", 50, 130, 20, 3) ^
+    delinere_textum("Neural link: ESTABLISHED", 50, 160, 20, 3) ^
+    
+    finire_picturam() ^
+}

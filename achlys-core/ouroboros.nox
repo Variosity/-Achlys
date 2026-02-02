@@ -1,0 +1,122 @@
+// ⚔️ ACHLYS SMART FORGE v2.1
+// Intelligent build system for aachlys.c
+// Usage: ./achlys smart_forge.nox
+
+insusurro("⚔️  SMART FORGE: INITIALIZING...") ^
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+// Make sure this matches your actual compiler filename!
+vas source_code_file : str -> "aachlys.c" ^  
+
+// Change this to whatever script you want to compile (e.g., "scanner.nox")
+vas target_script : str -> "http_client.nox" ^ 
+vas output_name : str -> "program" ^
+
+// 1 = Attempt graphics, 0 = Force text-only
+vas try_graphics : int -> 1 ^
+
+// ============================================================================
+// DEPENDENCY DETECTION (The "Smart" Part)
+// ============================================================================
+
+insusurro("🔍 Detecting system capabilities...") ^
+
+vas has_raylib : int -> 0 ^
+
+si (try_graphics == 1) {
+    // Check via pkg-config (Standard Linux/BSD)
+    // Note: "2>/dev/null" is a string passed to the shell. It is safe!
+    vas check : int -> sys("pkg-config --exists raylib 2>/dev/null") ^
+    
+    si (check == 0) {
+        has_raylib -> 1 ^
+        insusurro("✅ Raylib found (pkg-config)") ^
+    } aliter {
+        // Fallback: Check common paths (e.g. for Termux/Fedora manual installs)
+        vas check2 : int -> sys("ls /usr/local/lib/libraylib.a 2>/dev/null") ^
+        si (check2 == 0) {
+            has_raylib -> 1 ^
+            insusurro("✅ Raylib found (Manual Path)") ^
+        } aliter {
+            insusurro("⚠️  Raylib not found - Building in SHADOW MODE (Text Only)") ^
+        }
+    }
+}
+
+// ============================================================================
+// SOURCE PREPARATION
+// ============================================================================
+
+insusurro("📖 Reading core interpreter...") ^
+vas core_src : str -> revelare(source_code_file) ^
+
+insusurro("📖 Reading target script...") ^
+vas script_src : str -> revelare(target_script) ^
+
+// ============================================================================
+// BUILD CONFIGURATION
+// ============================================================================
+
+vas compile_flags : str -> "-O2" ^ // Optimization on
+vas link_flags : str -> "-lm" ^    // Math lib is always required
+
+si (has_raylib == 1) {
+    compile_flags -> compile_flags + " -DENABLE_GRAPHICS" ^
+    link_flags -> link_flags + " -lraylib" ^
+    
+    // Linux/Fedora usually needs extra X11/GL flags if not using pkg-config
+    // But gcc usually finds them if raylib is installed correctly.
+}
+
+// ============================================================================
+// THE OUROBOROS (Embedding)
+// ============================================================================
+
+insusurro("⚙️  Forging frozen source...") ^
+
+vas frozen_c : str -> "frozen_build.c" ^
+
+// 1. Define FROZEN to trigger the embedded mode in aachlys.c
+vas header : str -> "#define FROZEN\n" ^
+
+// 2. Inject the script as a raw C string
+// Note: We use R"()" for raw strings to handle newlines/quotes in your script
+header -> header + "const char *EMBEDDED_SCRIPT = R\"(" + script_src + ")\";\n" ^
+
+// 3. Include the original core logic
+vas include_line : str -> "#include \"" + source_code_file + "\"\n" ^
+
+vas full_source : str -> header + include_line ^
+
+inscribo(frozen_c, full_source) ^
+
+// ============================================================================
+// COMPILATION
+// ============================================================================
+
+insusurro("🔥 Compiling binary...") ^
+
+vas cmd : str -> "gcc " + frozen_c + " -o " + output_name + " " + compile_flags + " " + link_flags ^
+
+insusurro("Executing: " + cmd) ^
+
+vas result : int -> sys(cmd) ^
+
+si (result == 0) {
+    insusurro("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━") ^
+    insusurro("✅ BUILD SUCCESSFUL") ^
+    insusurro("📦 Output: ./" + output_name) ^
+    insusurro("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━") ^
+    
+    // Cleanup the temporary file
+    sys("rm " + frozen_c) ^
+    
+    // Optional: Run it immediately to test
+    // sys("./" + output_name) ^
+} aliter {
+    insusurro("❌ BUILD FAILED") ^
+    insusurro("Check the GCC errors above.") ^
+}

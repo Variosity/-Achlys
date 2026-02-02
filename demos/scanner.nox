@@ -1,0 +1,31 @@
+// ACHLYS PORT SCANNER v1.0
+// Usage: Scans a target for common open ports
+
+vas target : str -> "142.250.186.206" ^  // Google (or change to local IP)
+vas ports : arr -> [21, 22, 80, 443, 8080] ^
+
+insusurro("⚔️  INITIATING SCAN SEQUENCE...") ^
+insusurro("TARGET:") ^
+insusurro(target) ^
+
+vas i : int -> 0 ^
+dum (i < mensura(ports)) {
+    vas p : int -> ports[i] ^
+    
+    // Try to connect
+    vas sock : int -> conexus(target, p) ^
+    
+    si (sock != -1) {
+        insusurro("[+] OPEN PORT DETECTED:") ^
+        insusurro(p) ^
+        claudere(sock) ^
+    }
+    aliter {
+        // insusurro("[-] Closed/Filtered") ^ 
+    }
+    
+    // Increment
+    i -> i + 1 ^
+}
+
+insusurro("SCAN COMPLETE.") ^
