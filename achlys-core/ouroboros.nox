@@ -1,15 +1,15 @@
-// ⚔️ ACHLYS SMART FORGE v2.1
-// Intelligent build system for aachlys.c
+// ⚔️ OUROBOROS v2.1
+// Intelligent build system for achlys
 // Usage: ./achlys smart_forge.nox
 
-insusurro("⚔️  SMART FORGE: INITIALIZING...") ^
+insusurro("⚔️  OUROBOROS: INITIALIZING...") ^
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
 // Make sure this matches your actual compiler filename!
-vas source_code_file : str -> "aachlys.c" ^  
+vas source_code_file : str -> "achlys.c" ^  
 
 // Change this to whatever script you want to compile (e.g., "scanner.nox")
 vas target_script : str -> "http_client.nox" ^ 
