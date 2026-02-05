@@ -67,6 +67,7 @@
      TOK_WHILE,      // dum
      TOK_OPUS,       // opus
      TOK_REDDO,      // reddo
+     TOK_BREAK,      // abrumpere
      TOK_IMPORT,     // importare
      TOK_LPAREN, 
      TOK_RPAREN,     // ( )
@@ -79,6 +80,8 @@
      TOK_CARET,      // ^
      TOK_DOT,        // .
      TOK_APPEND,     // <<
+     TOK_AND,        // et
+     TOK_OR,         // vel
      TOK_OP          // +, -, *, /, ==, !=, <, >, <=, >=
  } TokenType;
  
@@ -137,6 +140,8 @@
  // ============================================================================
  // [SECTION 3] ENVIRONMENT (MEMORY)
  // ============================================================================
+ 
+ int break_flag = 0; // Add this Global
  
  typedef struct EnvEntry {
      char *name;
@@ -306,7 +311,7 @@ void env_set(Environment *env, const char *name, Value *val) {
  
  typedef enum {
      STMT_LET, STMT_ASSIGN, STMT_SET, STMT_APPEND, STMT_PRINT,
-     STMT_IF, STMT_WHILE, STMT_FUNC, STMT_RETURN, STMT_IMPORT, STMT_EXPR
+     STMT_IF, STMT_WHILE, STMT_FUNC, STMT_RETURN, STMT_IMPORT, STMT_BREAK, STMT_EXPR
  } StmtType;
  
  typedef struct Stmt Stmt;
@@ -419,7 +424,7 @@ void env_set(Environment *env, const char *name, Value *val) {
              continue;
          }
          
-         if (c == '+' || c == '-' || c == '*' || c == '/') {
+         if (c == '+' || c == '-' || c == '*' || c == '/' || c == '%') {
              char op[2] = {c, 0};
              lexer_add_token(lexer, TOK_OP, op, 0, 0);
              i++;
@@ -493,6 +498,19 @@ void env_set(Environment *env, const char *name, Value *val) {
              else if (strcmp(word, "opus") == 0) type = TOK_OPUS;
              else if (strcmp(word, "reddo") == 0) type = TOK_REDDO;
              else if (strcmp(word, "importare") == 0) type = TOK_IMPORT;
+             else if (strcmp(word, "abrumpere") == 0) type = TOK_BREAK;
+             else if (strcmp(word, "et") == 0) type = TOK_AND;  // <--- NEW
+             else if (strcmp(word, "vel") == 0) type = TOK_OR;  // <--- NEW
+             else if (strcmp(word, "verum") == 0) { 
+                lexer_add_token(lexer, TOK_INT, "1", 1, 0); 
+                free(word); 
+                continue; 
+            }
+            else if (strcmp(word, "falsum") == 0) { 
+                lexer_add_token(lexer, TOK_INT, "0", 0, 0); 
+                free(word); 
+                continue; 
+            }
              
              lexer_add_token(lexer, type, word, 0, 0);
              free(word);
@@ -550,6 +568,7 @@ void env_set(Environment *env, const char *name, Value *val) {
  Expr *parse_postfix(Parser *p);
  Expr *parse_unary(Parser *p); 
  Expr *parse_factor(Parser *p);
+ Expr *parse_comparison(Parser *p);
  Expr *parse_term(Parser *p);
  
  Expr *parse_primary(Parser *p) {
@@ -763,7 +782,7 @@ void env_set(Environment *env, const char *name, Value *val) {
      
      while (parser_peek(p)->type == TOK_OP) {
          char *op = parser_peek(p)->text;
-         if (strcmp(op, "*") == 0 || strcmp(op, "/") == 0) {
+         if (strcmp(op, "*") == 0 || strcmp(op, "/") == 0 || strcmp(op, "%") == 0) {
              parser_advance(p);
              Expr *right = parse_unary(p);
              
@@ -804,7 +823,7 @@ void env_set(Environment *env, const char *name, Value *val) {
      return left;
  }
  
- Expr *parse_expr(Parser *p) {
+ Expr *parse_comparison(Parser *p) {
      Expr *left = parse_term(p);
      
      while (parser_peek(p)->type == TOK_OP) {
@@ -828,6 +847,35 @@ void env_set(Environment *env, const char *name, Value *val) {
      
      return left;
  }
+ 
+ Expr *parse_expr(Parser *p) {
+    Expr *left = parse_comparison(p);
+    
+    while (parser_peek(p)->type == TOK_AND || parser_peek(p)->type == TOK_OR) {
+        TokenType type = parser_peek(p)->type;
+        char *op = type == TOK_AND ? "et" : "vel";
+        parser_advance(p);
+        
+        Expr *right = parse_comparison(p);
+        
+        Expr *e = malloc(sizeof(Expr));
+        e->type = EXPR_BINARY;
+        e->data.binary.left = left;
+        e->data.binary.op = strdup(op);
+        e->data.binary.right = right;
+        left = e;
+    }
+    return left;
+}
+ 
+ Stmt *parse_break(Parser *p) {
+    parser_advance(p); // Skip 'abrumpere'
+    parser_expect(p, TOK_CARET); // Expect ^
+    
+    Stmt *s = malloc(sizeof(Stmt));
+    s->type = STMT_BREAK;
+    return s;
+}
  
  Stmt *parse_stmt(Parser *p);
  
@@ -1000,6 +1048,7 @@ Stmt *parse_function(Parser *p) {
      if (t->type == TOK_OPUS) return parse_function(p);
      if (t->type == TOK_REDDO) return parse_return(p);
      if (t->type == TOK_IMPORT) return parse_import(p);
+     if (t->type == TOK_BREAK) return parse_break(p);
      
      if (t->type == TOK_IDENT) {
          Expr *expr = parse_expr(p);
@@ -1480,6 +1529,19 @@ Stmt *parse_function(Parser *p) {
              Value *left = eval_expr(e->data.binary.left, env);
              Value *right = eval_expr(e->data.binary.right, env);
              char *op = e->data.binary.op;
+             
+             if (strcmp(op, "et") == 0) {
+                // Short-circuit behavior for AND
+                int l_truth = truthy(left);
+                if (!l_truth) return val_int(0); // If left is false, result is false
+                return val_int(truthy(right));
+            }
+            if (strcmp(op, "vel") == 0) {
+                // Short-circuit behavior for OR
+                int l_truth = truthy(left);
+                if (l_truth) return val_int(1); // If left is true, result is true
+                return val_int(truthy(right));
+            }
 
              // [NEW] AUTOMATIC STRING CONCATENATION (The Fix)
             // Allows: "Age: " + 24   OR   24 + " years"
@@ -1522,6 +1584,7 @@ Stmt *parse_function(Parser *p) {
                  if (strcmp(op, "-") == 0) return val_int(left->data.i - right->data.i);
                  if (strcmp(op, "*") == 0) return val_int(left->data.i * right->data.i);
                  if (strcmp(op, "/") == 0) return val_int(left->data.i / right->data.i);
+                 if (strcmp(op, "%") == 0) return val_int(left->data.i % right->data.i);
                  if (strcmp(op, "<") == 0) return val_int(left->data.i < right->data.i);
                  if (strcmp(op, ">") == 0) return val_int(left->data.i > right->data.i);
                  if (strcmp(op, "<=") == 0) return val_int(left->data.i <= right->data.i);
@@ -1648,6 +1711,10 @@ Stmt *parse_function(Parser *p) {
              case STMT_WHILE: {
                  while (truthy(eval_expr(s->data.while_stmt.cond, env))) {
                      run_stmts(s->data.while_stmt.body, s->data.while_stmt.body_count, env);
+                     if (break_flag) {
+                       break_flag = 0; // Reset flag and exit loop
+                       break;
+                      }
                      if (return_value) return;
                  }
                  break;
@@ -1668,6 +1735,11 @@ Stmt *parse_function(Parser *p) {
              case STMT_RETURN: {
                  return_value = eval_expr(s->data.expr, env);
                  return;
+             }
+             
+             case STMT_BREAK: {
+               break_flag = 1;
+               return;
              }
              
              case STMT_IMPORT: {
