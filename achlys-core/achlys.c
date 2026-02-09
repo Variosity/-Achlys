@@ -1,6 +1,6 @@
 /*
  * ACHLYS - "The Mist of Death"
- * Version: Hybrid Core (Shadow/Neon) v1.2
+ * Version: Hybrid Core (Shadow/Neon) v1.5
  * Capabilities: Network (Hands), Graphics (Eyes - Optional), System (Voice)
  *
  * --- COMPILE INSTRUCTIONS ---
@@ -68,6 +68,12 @@
      TOK_OPUS,       // opus
      TOK_REDDO,      // reddo
      TOK_BREAK,      // abrumpere
+     TOK_CONTINUE,   // pergere
+     TOK_BIT_AND,    // &
+     TOK_BIT_OR,     // |
+     TOK_BIT_XOR,    // xor
+     TOK_BIT_NOT,    // ~
+     TOK_RSHIFT,     // >>
      TOK_IMPORT,     // importare
      TOK_LPAREN, 
      TOK_RPAREN,     // ( )
@@ -82,6 +88,8 @@
      TOK_APPEND,     // <<
      TOK_AND,        // et
      TOK_OR,         // vel
+     TOK_CONST,
+     TOK_SHARED,
      TOK_OP          // +, -, *, /, ==, !=, <, >, <=, >=
  } TokenType;
  
@@ -142,6 +150,7 @@
  // ============================================================================
  
  int break_flag = 0; // Add this Global
+ int continue_flag = 0; // Add this Global
  
  typedef struct EnvEntry {
      char *name;
@@ -155,6 +164,7 @@
  
  // Global Function Registry
  Environment *global_funcs;
+ Environment *globals;
  // Return Value Register (For recursion handling)
  Value *return_value = NULL;
  
@@ -173,25 +183,45 @@
 }
 
 // [UPDATED] Update an existing variable (Strict: Crashes if variable not found)
+// REPLACE YOUR EXISTING env_set WITH THIS:
 void env_set(Environment *env, const char *name, Value *val) {
+    // 1. Try updating local
     for (EnvEntry *e = env->head; e; e = e->next) {
         if (strcmp(e->name, name) == 0) {
             e->value = val;
             return;
         }
     }
-    // HARD CRASH on implicit declaration
-    fprintf(stderr, "💀 ERROR: Variable '%s' not declared. Use 'vas %s : type' first.\n", name, name);
+    // 2. Try updating global (if allowed)
+    if (globals) {
+        for (EnvEntry *e = globals->head; e; e = e->next) {
+            if (strcmp(e->name, name) == 0) {
+                e->value = val;
+                return;
+            }
+        }
+    }
+    // 3. Error
+    fprintf(stderr, "💀 ERROR: Variable '%s' not declared. Use 'vas' or 'communis' first.\n", name);
     exit(1);
 }
  
- Value *env_get(Environment *env, const char *name) {
-     for (EnvEntry *e = env->head; e; e = e->next) {
-         if (strcmp(e->name, name) == 0) return e->value;
-     }
-     fprintf(stderr, "💀 [MEMORY ERROR] Variable '%s' not found in this reality.\n", name);
-     exit(1);
- }
+// REPLACE YOUR EXISTING env_get WITH THIS:
+Value *env_get(Environment *env, const char *name) {
+    // 1. Check Local Scope
+    for (EnvEntry *e = env->head; e; e = e->next) {
+        if (strcmp(e->name, name) == 0) return e->value;
+    }
+    // 2. Check Global Scope (The new feature)
+    if (globals) {
+        for (EnvEntry *e = globals->head; e; e = e->next) {
+            if (strcmp(e->name, name) == 0) return e->value;
+        }
+    }
+    // 3. Panic
+    fprintf(stderr, "💀 [MEMORY ERROR] Variable '%s' not found in this reality.\n", name);
+    exit(1);
+}
  
  // ============================================================================
  // [SECTION 4] VALUE FACTORY
@@ -311,7 +341,7 @@ void env_set(Environment *env, const char *name, Value *val) {
  
  typedef enum {
      STMT_LET, STMT_ASSIGN, STMT_SET, STMT_APPEND, STMT_PRINT,
-     STMT_IF, STMT_WHILE, STMT_FUNC, STMT_RETURN, STMT_IMPORT, STMT_BREAK, STMT_EXPR
+     STMT_IF, STMT_WHILE, STMT_FUNC, STMT_RETURN, STMT_IMPORT, STMT_BREAK, STMT_CONTINUE, STMT_EXPR, STMT_CONST, STMT_SHARED
  } StmtType;
  
  typedef struct Stmt Stmt;
@@ -400,6 +430,9 @@ void env_set(Environment *env, const char *name, Value *val) {
         if (c == '^') { lexer_add_token(lexer, TOK_CARET, "^", 0, 0); i++; continue; }
         if (c == ',') { lexer_add_token(lexer, TOK_OP, ",", 0, 0); i++; continue; }
         if (c == '.') { lexer_add_token(lexer, TOK_DOT, ".", 0, 0); i++; continue; }
+        if (c == '&') { lexer_add_token(lexer, TOK_BIT_AND, "&", 0, 0); i++; continue; }
+        if (c == '|') { lexer_add_token(lexer, TOK_BIT_OR, "|", 0, 0); i++; continue; }
+        if (c == '~') { lexer_add_token(lexer, TOK_BIT_NOT, "~", 0, 0); i++; continue; }
          
          // Multi-char operators
          if (c == '<' && src[i+1] == '<') {
@@ -407,6 +440,12 @@ void env_set(Environment *env, const char *name, Value *val) {
              i += 2;
              continue;
          }
+
+         if (c == '>' && src[i+1] == '>') { // Right Shift >>
+            lexer_add_token(lexer, TOK_RSHIFT, NULL, 0, 0);
+            i += 2;
+            continue;
+        }
          
          // Arrow ->
          if (c == '-' && src[i+1] == '>') {
@@ -461,6 +500,24 @@ void env_set(Environment *env, const char *name, Value *val) {
          
          // Numbers (Integers and Floats)
          if (isdigit(c)) {
+            // Check for Hex (0x...)
+            if (c == '0' && (src[i+1] == 'x' || src[i+1] == 'X')) {
+                i += 2; // Skip '0x'
+                int start = i;
+                while (isxdigit(src[i])) i++;
+                
+                char *n = malloc(i - start + 1);
+                memcpy(n, src + start, i - start);
+                n[i - start] = 0;
+                
+                // Parse as base 16
+                long val = strtol(n, NULL, 16);
+                lexer_add_token(lexer, TOK_INT, n, val, 0);
+                free(n);
+                continue;
+            }
+         
+            else {
             int start = i, fl = 0;
             // 1. Exact same parsing logic as before
             while (isdigit(src[i]) || (src[i] == '.' && !fl)) { 
@@ -480,6 +537,7 @@ void env_set(Environment *env, const char *name, Value *val) {
             free(n); // Safe to free because lexer_add_token made a copy
             continue;
         }
+    }
          
          // Identifiers and Keywords
          if (isalpha(c) || c == '_') {
@@ -499,8 +557,12 @@ void env_set(Environment *env, const char *name, Value *val) {
              else if (strcmp(word, "reddo") == 0) type = TOK_REDDO;
              else if (strcmp(word, "importare") == 0) type = TOK_IMPORT;
              else if (strcmp(word, "abrumpere") == 0) type = TOK_BREAK;
+             else if (strcmp(word, "pergere") == 0) type = TOK_CONTINUE;
+             else if (strcmp(word, "constans") == 0) type = TOK_CONST;
+             else if (strcmp(word, "communis") == 0) type = TOK_SHARED;
              else if (strcmp(word, "et") == 0) type = TOK_AND;  // <--- NEW
              else if (strcmp(word, "vel") == 0) type = TOK_OR;  // <--- NEW
+             else if (strcmp(word, "xor") == 0) type = TOK_BIT_XOR;
              else if (strcmp(word, "verum") == 0) { 
                 lexer_add_token(lexer, TOK_INT, "1", 1, 0); 
                 free(word); 
@@ -739,43 +801,69 @@ void env_set(Environment *env, const char *name, Value *val) {
  }
  
  Expr *parse_unary(Parser *p) {
-     if (parser_peek(p)->type == TOK_OP) {
-         char *op = parser_peek(p)->text;
-         if (strcmp(op, "-") == 0) {
-             parser_advance(p);
-             Expr *right = parse_unary(p);
-             
-             // Convert "-x" to "0 - x"
-             Expr *zero = malloc(sizeof(Expr));
-             zero->type = EXPR_INT;
-             zero->data.i = 0;
-             
-             Expr *e = malloc(sizeof(Expr));
-             e->type = EXPR_BINARY;
-             e->data.binary.left = zero;
-             e->data.binary.op = strdup("-");
-             e->data.binary.right = right;
-             return e;
-         }
-         if (strcmp(op, "!") == 0) {
-             parser_advance(p);
-             Expr *right = parse_unary(p);
-             
-             // Convert "!x" to "x == 0"
-             Expr *zero = malloc(sizeof(Expr));
-             zero->type = EXPR_INT;
-             zero->data.i = 0;
-             
-             Expr *e = malloc(sizeof(Expr));
-             e->type = EXPR_BINARY;
-             e->data.binary.left = right;
-             e->data.binary.op = strdup("==");
-             e->data.binary.right = zero;
-             return e;
-         }
-     }
-     return parse_postfix(p);
- }
+    // Handle Unary Operators (-, !, ~)
+    if (parser_peek(p)->type == TOK_OP || parser_peek(p)->type == TOK_BIT_NOT) {
+        char *op = parser_peek(p)->text;
+        TokenType type = parser_peek(p)->type;
+
+        // Handle Negative Numbers (-x)
+        if (type == TOK_OP && strcmp(op, "-") == 0) {
+            parser_advance(p);
+            Expr *right = parse_unary(p);
+            
+            // Convert "-x" to "0 - x"
+            Expr *zero = malloc(sizeof(Expr));
+            zero->type = EXPR_INT;
+            zero->data.i = 0;
+            
+            Expr *e = malloc(sizeof(Expr));
+            e->type = EXPR_BINARY;
+            e->data.binary.left = zero;
+            e->data.binary.op = strdup("-");
+            e->data.binary.right = right;
+            return e;
+        }
+        
+        // Handle Logical NOT (!x)
+        if (type == TOK_OP && strcmp(op, "!") == 0) {
+            parser_advance(p);
+            Expr *right = parse_unary(p);
+            
+            // Convert "!x" to "x == 0"
+            Expr *zero = malloc(sizeof(Expr));
+            zero->type = EXPR_INT;
+            zero->data.i = 0;
+            
+            Expr *e = malloc(sizeof(Expr));
+            e->type = EXPR_BINARY;
+            e->data.binary.left = right;
+            e->data.binary.op = strdup("==");
+            e->data.binary.right = zero;
+            return e;
+        }
+        
+        // Handle Bitwise NOT (~x)
+        if (type == TOK_BIT_NOT || (type == TOK_OP && strcmp(op, "~") == 0)) {
+           parser_advance(p);
+           Expr *right = parse_unary(p);
+           
+           Expr *e = malloc(sizeof(Expr));
+           e->type = EXPR_BINARY;
+           e->data.binary.left = right;
+           e->data.binary.op = strdup("~");
+           
+           // [FIX] Create a Syntax Tree Node (Expr), NOT a Runtime Value
+           Expr *dummy = malloc(sizeof(Expr));
+           dummy->type = EXPR_INT;
+           dummy->data.i = 0;
+           
+           e->data.binary.right = dummy;
+           return e;
+       }
+    }
+    
+    return parse_postfix(p);
+}
  
  Expr *parse_factor(Parser *p) {
      Expr *left = parse_unary(p); 
@@ -822,9 +910,42 @@ void env_set(Environment *env, const char *name, Value *val) {
      
      return left;
  }
+
+ // 1. BITWISE (Calls parse_term for the next level down)
+ Expr *parse_bitwise(Parser *p) {
+    Expr *left = parse_term(p); // Lower precedence (+ -)
+    
+    while (parser_peek(p)->type == TOK_BIT_AND || 
+           parser_peek(p)->type == TOK_BIT_OR || 
+           parser_peek(p)->type == TOK_BIT_XOR ||
+           parser_peek(p)->type == TOK_RSHIFT ||
+           parser_peek(p)->type == TOK_APPEND) { 
+        
+        TokenType type = parser_peek(p)->type;
+        char *op = "";
+        
+        if (type == TOK_BIT_AND) op = "&";
+        else if (type == TOK_BIT_OR) op = "|";
+        else if (type == TOK_BIT_XOR) op = "^";
+        else if (type == TOK_RSHIFT) op = ">>";
+        else if (type == TOK_APPEND) op = "<<"; 
+        
+        parser_advance(p);
+        Expr *right = parse_term(p); // Right side is also a term
+        
+        Expr *e = malloc(sizeof(Expr));
+        e->type = EXPR_BINARY;
+        e->data.binary.left = left;
+        e->data.binary.op = strdup(op);
+        e->data.binary.right = right;
+        left = e;
+    }
+    return left;
+}
  
+ // 2. COMPARISON (Calls parse_bitwise for the next level down)
  Expr *parse_comparison(Parser *p) {
-     Expr *left = parse_term(p);
+     Expr *left = parse_bitwise(p); // [FIX] Now calls bitwise
      
      while (parser_peek(p)->type == TOK_OP) {
          char *op = parser_peek(p)->text;
@@ -832,7 +953,7 @@ void env_set(Environment *env, const char *name, Value *val) {
              strcmp(op, "==") == 0 || strcmp(op, "!=") == 0 ||
              strcmp(op, "<=") == 0 || strcmp(op, ">=") == 0) {
              parser_advance(p);
-             Expr *right = parse_term(p);
+             Expr *right = parse_bitwise(p); // [FIX] Right side is also bitwise
              
              Expr *e = malloc(sizeof(Expr));
              e->type = EXPR_BINARY;
@@ -844,12 +965,12 @@ void env_set(Environment *env, const char *name, Value *val) {
              break;
          }
      }
-     
      return left;
  }
  
+ // 3. EXPRESSION (Calls parse_comparison for the next level down)
  Expr *parse_expr(Parser *p) {
-    Expr *left = parse_comparison(p);
+    Expr *left = parse_comparison(p); // [FIX] Calls comparison (Top of chain)
     
     while (parser_peek(p)->type == TOK_AND || parser_peek(p)->type == TOK_OR) {
         TokenType type = parser_peek(p)->type;
@@ -867,6 +988,15 @@ void env_set(Environment *env, const char *name, Value *val) {
     }
     return left;
 }
+
+Stmt *parse_continue(Parser *p) {
+    parser_advance(p); // Skip 'pergere'
+    parser_expect(p, TOK_CARET); // Expect ^
+    
+    Stmt *s = malloc(sizeof(Stmt));
+    s->type = STMT_CONTINUE;
+    return s;
+}
  
  Stmt *parse_break(Parser *p) {
     parser_advance(p); // Skip 'abrumpere'
@@ -874,6 +1004,47 @@ void env_set(Environment *env, const char *name, Value *val) {
     
     Stmt *s = malloc(sizeof(Stmt));
     s->type = STMT_BREAK;
+    return s;
+}
+
+// Essentially the same as parse_let, but with different Statement Types
+Stmt *parse_const(Parser *p) {
+    parser_advance(p); // Skip 'constans'
+    Token *name = parser_advance(p);
+
+    parser_expect(p, TOK_COLON); 
+    Token *type_token = parser_advance(p); // Ignore type for now or check it
+    char *hint = strdup(type_token->text);
+
+    parser_expect(p, TOK_ARROW);
+    Expr *value = parse_expr(p);
+    parser_expect(p, TOK_CARET);
+
+    Stmt *s = malloc(sizeof(Stmt));
+    s->type = STMT_CONST;
+    s->data.let.name = strdup(name->text);
+    s->data.let.type_hint = hint;
+    s->data.let.value = value;
+    return s;
+}
+
+Stmt *parse_shared(Parser *p) {
+    parser_advance(p); // Skip 'communis'
+    Token *name = parser_advance(p);
+
+    parser_expect(p, TOK_COLON); 
+    Token *type_token = parser_advance(p);
+    char *hint = strdup(type_token->text);
+
+    parser_expect(p, TOK_ARROW);
+    Expr *value = parse_expr(p);
+    parser_expect(p, TOK_CARET);
+
+    Stmt *s = malloc(sizeof(Stmt));
+    s->type = STMT_SHARED;
+    s->data.let.name = strdup(name->text);
+    s->data.let.type_hint = hint;
+    s->data.let.value = value;
     return s;
 }
  
@@ -1042,6 +1213,8 @@ Stmt *parse_function(Parser *p) {
      Token *t = parser_peek(p);
      
      if (t->type == TOK_LET) return parse_let(p);
+     if (t->type == TOK_CONST) return parse_const(p);   // <--- ADD
+    if (t->type == TOK_SHARED) return parse_shared(p);   // <--- ADD
      if (t->type == TOK_PRINT) return parse_print(p);
      if (t->type == TOK_IF) return parse_if(p);
      if (t->type == TOK_WHILE) return parse_while(p);
@@ -1049,6 +1222,7 @@ Stmt *parse_function(Parser *p) {
      if (t->type == TOK_REDDO) return parse_return(p);
      if (t->type == TOK_IMPORT) return parse_import(p);
      if (t->type == TOK_BREAK) return parse_break(p);
+     if (t->type == TOK_CONTINUE) return parse_continue(p);
      
      if (t->type == TOK_IDENT) {
          Expr *expr = parse_expr(p);
@@ -1482,6 +1656,13 @@ Stmt *parse_function(Parser *p) {
                  char b[2] = { (char)code->data.i, 0 };
                  return val_string(b);
              }
+             // [NEW] codex(string) -> int (New: ord)
+             // Converts first character of string to its ASCII integer
+             if (strcmp(e->data.call.name, "codex") == 0) {
+                Value *s = eval_expr(e->data.call.args[0], env);
+                if (s->type != VAL_STRING) return val_int(0);
+                return val_int((unsigned char)s->data.s[0]);
+            }
              
              // char_at is an alias for signum_ex for backward compatibility if needed
              if (strcmp(e->data.call.name, "char_at") == 0) {
@@ -1591,6 +1772,15 @@ Stmt *parse_function(Parser *p) {
                  if (strcmp(op, ">=") == 0) return val_int(left->data.i >= right->data.i);
                  if (strcmp(op, "==") == 0) return val_int(left->data.i == right->data.i);
                  if (strcmp(op, "!=") == 0) return val_int(left->data.i != right->data.i);
+                 if (strcmp(op, "&") == 0) return val_int(left->data.i & right->data.i);
+                 if (strcmp(op, "|") == 0) return val_int(left->data.i | right->data.i);
+                 if (strcmp(op, "^") == 0) return val_int(left->data.i ^ right->data.i);
+                 if (strcmp(op, ">>") == 0) return val_int(left->data.i >> right->data.i);
+                 // Smart Shift: '<<'
+                 // If it's a number, it's Left Shift. If it's a list (handled above), it's Append.
+                 if (strcmp(op, "<<") == 0) return val_int(left->data.i << right->data.i);
+                 if (strcmp(op, "~") == 0) return val_int(~left->data.i);
+
              }
              
              // FLOAT MATH
@@ -1632,6 +1822,7 @@ Stmt *parse_function(Parser *p) {
  void run_stmts(Stmt **stmts, int count, Environment *env) {
      for (int i = 0; i < count; i++) {
          if (return_value) return;
+         if (break_flag || continue_flag) return;
          
          Stmt *s = stmts[i];
          
@@ -1715,6 +1906,10 @@ Stmt *parse_function(Parser *p) {
                        break_flag = 0; // Reset flag and exit loop
                        break;
                       }
+                     if (continue_flag) {
+                       continue_flag = 0; // Reset flag and continue loop
+                       continue;
+                     }
                      if (return_value) return;
                  }
                  break;
@@ -1731,6 +1926,13 @@ Stmt *parse_function(Parser *p) {
                  env_def(global_funcs, s->data.func.name, func);
                  break;
              }
+            case STMT_CONST:
+            case STMT_SHARED: {
+                Value *val = eval_expr(s->data.let.value, env);
+                // We define these DIRECTLY in the 'globals' environment
+                env_def(globals, s->data.let.name, val);
+                break;
+            }
              
              case STMT_RETURN: {
                  return_value = eval_expr(s->data.expr, env);
@@ -1741,7 +1943,12 @@ Stmt *parse_function(Parser *p) {
                break_flag = 1;
                return;
              }
-             
+
+             case STMT_CONTINUE: {
+               continue_flag = 1;
+               return;
+             }
+
              case STMT_IMPORT: {
                  Value *path = eval_expr(s->data.expr, env);
                  FILE *f = fopen(path->data.s, "r");
@@ -1848,6 +2055,7 @@ Stmt *parse_function(Parser *p) {
      printf("⚔️  Achlys booting [%s]\n", argv[1]);
      
      global_funcs = env_new();
+     globals = env_new();
      
      Lexer lexer;
      lexer_init(&lexer, source);
