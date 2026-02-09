@@ -1,0 +1,121 @@
+// ⚔️ PROJECT GAUNTLET: Wrist-Mounted C2 Monitor
+// Hardware: Galaxy Watch 7 (Wear OS) | Connection: SSH Tunnel (Umbilical)
+
+// --- CONFIGURATION ---
+// We connect to Localhost because the SSH Tunnel (-L) forwards it to the server.
+constans HOST : str -> "127.0.0.1"^ 
+constans PORT : int -> 4444^
+constans KEY  : int -> 0xAA^  // Encryption Key (Must match Server)
+
+// --- HELPER: VIBRATE ---
+// Triggers the watch vibration motor via Termux API
+opus vibrate() {
+    // Requires 'termux-api' package and app. 
+    // If not installed, this just fails silently.
+    sys("termux-vibrate -d 500 -f")^ 
+    reddo 0^
+}
+
+// --- CRYPTO CORE (XOR Cipher) ---
+opus encrypt(text) {
+    vas len : int -> mensura(text)^
+    vas result : str -> ""^
+    vas i : int -> 0^
+    
+    dum (i < len) {
+        // 1. Get char at index
+        vas char : str -> text[i]^
+        
+        // 2. Convert to ASCII Int (using native 'codex')
+        vas code : int -> codex(char)^
+        
+        // 3. XOR with Key
+        vas enc_code : int -> code xor KEY^
+        
+        // 4. Convert back to Char (using native 'signum_ex')
+        vas cipher_char : str -> signum_ex(enc_code)^
+        
+        // 5. Append
+        result -> result + cipher_char^
+        
+        i -> i + 1^
+    }
+    reddo result^
+}
+
+// --- MAIN LOOP ---
+opus main() {
+    scribo(">> GAUNTLET: INITIALIZING...")^
+    
+    // 1. Establish Link (Through the SSH Tunnel)
+    vas sock : int -> necto(HOST, PORT)^
+    
+    si (sock < 0) {
+        scribo(">> UMBILICAL SEVERED. (Is the SSH tunnel up?)")^
+        reddo 0^
+    }
+    
+    scribo(">> UMBILICAL CONNECTED.")^
+    vibrate()^
+    
+    // 2. Handshake
+    mitto(sock, encrypt("WATCH_ONLINE"))^
+    
+    // 3. Monitor Loop
+    dum (verum) {
+        // Wait for data (Blocking)
+        vas raw_msg : str -> recipio(sock, 1024)^
+        
+        // Check for disconnect
+        vas len : int -> mensura(raw_msg)^
+        si (len < 1) { 
+            scribo(">> LINK LOST.")^
+            vibrate()^
+            vibrate()^
+            abrumpere^ 
+        }
+        
+        // Decrypt
+        vas cmd : str -> encrypt(raw_msg)^
+        
+        // --- COMMAND PROCESSING ---
+        
+        // A. Intrusion Alert (Server sends "ALERT")
+        si (cmd == "ALERT") {
+            scribo("!! INTRUSION DETECTED !!")^
+            vibrate()^
+            vibrate()^
+            vibrate()^
+        }
+        
+        // B. Silent Ping (Keepalive)
+        si (cmd == "PING") {
+            scribo(".")^
+        }
+        
+        // C. Remote Execution (If you want to run shell commands on the watch)
+        // Only runs if command starts with "EXEC:"
+        // Example: EXEC:id
+        // (You'd need to parse the string, but for now let's just run anything else)
+        
+        si (cmd != "ALERT") {
+            si (cmd != "PING") {
+                scribo(">> CMD: " + cmd)^
+                vibrate()^
+                
+                // Execute and pipe output to file
+                sys(cmd + " > .watch_out")^
+                vas output : str -> revelare(".watch_out")^
+                sys("rm .watch_out")^
+                
+                // Send result back
+                mitto(sock, encrypt(output))^
+            }
+        }
+    }
+    
+    claudere(sock)^
+    reddo 0^
+}
+
+main()^
