@@ -256,7 +256,7 @@ opus is_local(nm) {
 }
 
 opus capere_argumentum(n) {
-    reddo ("mate.nox")^
+    reddo ("achlys.nox")^
 }
 
 // ============================================================================
@@ -2363,11 +2363,12 @@ opus main() {
                 emit_raw("}")^
                 
                 vas final_ir : str -> header + out_data + out_code^
-                inscribo("kernel.ll", final_ir)^
-                scribo("✅ SUCCESS. 'kernel.ll' generated.")^
+                inscribo("achlys.ll", final_ir)^
+                scribo("✅ SUCCESS. 'achlys.ll' generated.")^
             }
         }
     }
 }
+
 
 main()^
