@@ -1,0 +1,147 @@
+// 🐚 ASH (Achlys SHell) v2.0 - "The Latin Core"
+// Usage: enumerare (ls), purgare (clear), instrue (install)
+
+// Load the Package Manager Driver
+importare("umbrae.nox")^ 
+
+constans HOST : str -> "ACHLYS"^
+constans USER : str -> "root"^
+
+opus help() {
+    scribo("--- TABULA IMPERIORUM (Command List) ---")^
+    scribo(" enumerare      : List files (ls)")^
+    scribo(" purgare        : Clear screen")^
+    scribo(" identitas      : Who am I?")^
+    scribo(" revelare <f>   : Read file (cat)")^
+    scribo(" umbrae instrue : Install package")^
+    scribo(" exire          : Log out")^
+    reddo 0^
+}
+
+opus prompt() {
+    // Cyberpunk Prompt: [root::ACHLYS]~> 
+    // We construct it manually since we don't have printf format strings yet
+    vas p : str -> "[" + USER + "::" + HOST + "]~> "^
+    sys("printf '" + p + "'")^
+    reddo 0^
+}
+
+opus main() {
+    sys("clear")^
+    scribo("⚔️  ACHLYS OS v1.5 [HYBRID CORE] ONLINE")^
+    scribo("Scrive 'auxilium' ad indicem imperiorum videndum.")^
+
+    dum (verum) {
+        prompt()^
+        
+        // 1. CAPTURE INPUT
+        vas raw : str -> capio()^
+        
+        // 2. PARSE (The new Power!)
+        // Split input by space: "umbrae instrue nmap" -> ["umbrae", "instrue", "nmap"]
+        vas args : arr -> scindere(raw, " ")^
+        vas count : int -> mensura(args)^
+        
+        si (count > 0) {
+            vas cmd : str -> args[0]^
+            
+            // --- SYSTEM COMMANDS ---
+            
+            si (cmd == "exire") {
+                scribo("Vale.")^
+                abrumpere^
+            }
+            
+            si (cmd == "auxilium") {
+                help()^
+            }
+            
+            si (cmd == "purgare") {
+                sys("clear")^
+            }
+            
+            si (cmd == "identitas") {
+                scribo(USER)^
+            }
+            
+            // --- FILE SYSTEM (LATIN) ---
+            
+            si (cmd == "enumerare") {
+                // ls -F (classify) --color
+                sys("ls -F --color=auto")^
+            }
+            
+            si (cmd == "revelare") {
+                si (count > 1) {
+                    vas content : str -> revelare(args[1])^
+                    scribo(content)^
+                } aliter {
+                    scribo("Error: Nomen fasciculi deest (Missing filename).")^
+                }
+            }
+            
+            // --- PACKAGE MANAGER (UMBRAE) ---
+            
+            si (cmd == "umbrae") {
+                si (count > 2) {
+                    vas action : str -> args[1]^
+                    
+                    si (action == "instrue") {
+                        // LOOP THROUGH PACKAGES
+                        // Start at index 2 (pkg1)
+                        vas i : int -> 2^
+                        vas verbose : int -> 0^
+                        
+                        dum (i < count) {
+                            vas item : str -> args[i]^
+                            
+                            // Check for Flags (using pars)
+                            vas prefix : str -> pars(item, 0, 1)^
+                            
+                            si (prefix == "-") {
+                                si (item == "-v") {
+                                    scribo(">> [VERBOSE MODE ACTIVE]")^
+                                    vas verbose : int -> 1^
+                                }
+                                // Add more flags here (e.g., -f for force)
+                            } aliter {
+                                // It is a package name -> Install it
+                                scribo(">> Target acquired: " + item)^
+                                instrue(item)^
+                            }
+                            
+                            i -> i + 1^
+                        }
+                        
+                    } aliter {
+                        scribo("Actio ignota: " + action)^
+                    }
+                } aliter {
+                    scribo("Usus: umbrae instrue <pkg1> <pkg2> [-v]")^
+                }
+            }
+            
+            // --- FALLBACK (Bash passthrough) ---
+            // If command not recognized, try running it as a Linux command
+            si (cmd != "exire") {
+             si (cmd != "auxilium") {
+              si (cmd != "purgare") {
+               si (cmd != "identitas") {
+                si (cmd != "enumerare") {
+                 si (cmd != "revelare") {
+                  si (cmd != "umbrae") {
+                    // Pass the raw string to system()
+                    sys(raw)^
+                  }
+                 }
+                }
+               }
+              }
+             }
+            }
+        }
+    }
+    reddo 0^
+}
+
+main()^

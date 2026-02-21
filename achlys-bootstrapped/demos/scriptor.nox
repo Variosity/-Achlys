@@ -1,0 +1,102 @@
+// 📜 SCRIPTOR v1.1 - The Achlys Line Editor
+// Capabilities: Read, Write, Edit (In-Place)
+
+constans PROMPT : str -> "[EDIT]~> "^
+communis buffer : arr -> []^ 
+
+opus help() {
+    scribo("--- SCRIPTOR COMMANDS ---")^
+    scribo(" aperire <file>     : Open File")^
+    scribo(" videre             : View Buffer")^
+    scribo(" addere <text>      : Append Line")^
+    scribo(" mutare <n> <text>  : Edit Line N")^
+    scribo(" scribere <file>    : Save File")^
+    scribo(" exire              : Quit")^
+    reddo 0^
+}
+
+opus view_buffer() {
+    vas count : int -> mensura(buffer)^
+    si (count == 0) {
+        scribo("(Buffer vacuus est)")^
+    } aliter {
+        vas i : int -> 0^
+        dum (i < count) {
+            scribo(i + ": " + buffer[i])^
+            i -> i + 1^
+        }
+    }
+    reddo 0^
+}
+
+opus save_file(filename) {
+    vas content : str -> iunctura(buffer, "\n")^
+    vas ret : int -> inscribo(filename, content)^
+    si (ret == 0) { scribo(">> SALVUM: " + filename)^ } 
+    aliter { scribo(">> ERROR: Non potuit scribere.")^ }
+    reddo 0^
+}
+
+opus main() {
+    sys("clear")^
+    scribo("📜 SCRIPTOR v1.1 ONLINE")^
+
+    dum (verum) {
+        sys("printf '" + PROMPT + "'")^
+        vas raw : str -> capio()^
+        vas args : arr -> scindere(raw, " ")^
+        vas count : int -> mensura(args)^
+        
+        si (count > 0) {
+            vas cmd : str -> args[0]^
+            
+            si (cmd == "exire") { abrumpere^ }
+            si (cmd == "auxilium") { help()^ }
+            si (cmd == "videre") { view_buffer()^ }
+            
+            si (cmd == "aperire") {
+                si (count > 1) {
+                    vas filename : str -> args[1]^
+                    vas raw_content : str -> revelare(filename)^
+                    vas len : int -> mensura(raw_content)^
+                    
+                    si (len > 0) {
+                        buffer -> scindere(raw_content, "\n")^
+                        scribo(">> Apertum: " + filename)^
+                    } aliter {
+                        scribo(">> Novus fasciculus (New File) or Empty.")^
+                        buffer -> []^
+                    }
+                }
+            }
+            
+            si (cmd == "scribere") {
+                si (count > 1) { save_file(args[1])^ }
+            }
+            
+            si (cmd == "addere") {
+                si (count > 1) {
+                    vas line : str -> pars(raw, 7, 1000)^ // Substring after "addere "
+                    buffer << line^
+                    scribo(">> Linea addita.")^
+                }
+            }
+            
+            // THE FIX: IN-PLACE EDITING
+            si (cmd == "mutare") {
+                si (count > 2) {
+                    vas idx : int -> numerus(args[1])^
+                    vas prefix_len : int -> mensura(args[0]) + mensura(args[1]) + 2^
+                    vas line : str -> pars(raw, prefix_len, 1000)^
+                    
+                    // Uses the new C Patch syntax:
+                    buffer[idx] -> line^ 
+                    scribo(">> Linea " + idx + " mutata.")^
+                }
+            }
+        }
+    }
+    reddo 0^
+}
+
+main()^

@@ -1,0 +1,43 @@
+// 🛡️ UMBRAE: The Achlys Package Manager (Library Mode)
+// Capabilities: instrue (install), renovare (update)
+
+constans REPO_URL : str -> "https://raw.githubusercontent.com/YOUR_USER/achlys-repo/main/"^
+
+// --- CORE UTILS ---
+
+opus hash(text) {
+    vas h : int -> 5381^
+    vas i : int -> 0^
+    vas len : int -> mensura(text)^
+    
+    dum (i < len) {
+        vas c : int -> codex(text[i])^
+        h -> ((h <<< 5) + h) + c^
+        i -> i + 1^
+    }
+    reddo h^
+}
+
+// --- LATIN API ---
+
+// instrue (build/install)
+opus instrue(pkg_name) {
+    scribo(">> UMBRAE: Petens " + pkg_name + " (Fetching)...")^
+    
+    vas target : str -> pkg_name + ".nox"^
+    vas full_url : str -> REPO_URL + target^
+    
+    // Using system curl
+    vas cmd : str -> "curl -s -L " + full_url + " -o " + target^
+    vas ret : int -> sys(cmd)^
+    
+    si (ret == 0) {
+        vas content : str -> revelare(target)^
+        vas h : int -> hash(content)^
+        
+        scribo(">> INTEGRITAS: " + h)^
+        scribo(">> CONFECTUM: " + target + " inauguratus est.")^
+    } aliter {
+        scribo(">> ERROR: Connexio defecit.")^
+    }
+}
