@@ -2251,7 +2251,7 @@ opus expand_imports(stmts) {
 // ============================================================================
 
 opus main() {
-    scribo("⚔️  ACHLYS -> LLVM COMPILER (STAGE 3.5)")^
+    scribo("⚔️  ACHLYS -> LLVM COMPILER (STAGE 1.8)")^
     
     init_constants()^
     global_tokens -> []^
