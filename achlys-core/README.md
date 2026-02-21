@@ -1,6 +1,6 @@
 /*
  * ACHLYS - "The Mist of Death"
- * Version: Hybrid Core (Shadow/Neon) v1.2
+ * Version: Hybrid Core (Shadow/Neon) v1.5
  * Capabilities: Network (Hands), Graphics (Eyes - Optional), System (Voice)
  *
  * --- COMPILE INSTRUCTIONS ---
