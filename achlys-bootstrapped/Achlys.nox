@@ -97,7 +97,7 @@ communis lbl_counter : int -> 0^
 communis asm_main : str -> ""^
 communis asm_funcs : str -> ""^
 communis in_func : int -> 0^
-communis local_vars : arr -> []^ 
+communis local_vars : arr -> []^
 communis stack_depth : int -> 0^
 
 // ============================================================================
@@ -122,13 +122,14 @@ opus int_to_str(n) {
 opus hex_to_dec(h) {
     vas len : int -> mensura(h)^
     vas val : int -> 0^
-    vas i : int -> 0^ // [FIX] Start at 0, lexer already stripped '0x'
+    vas i : int -> 0^
     dum (i < len) {
         vas c : int -> codex(pars(h, i, 1))^
         val -> val * 16^
-        si (c >= 48) { si (c <= 57) { val -> val + (c - 48)^ } }
-        si (c >= 65) { si (c <= 70) { val -> val + (c - 55)^ } }
-        si (c >= 97) { si (c <= 102) { val -> val + (c - 87)^ } }
+        // [FIX] Use Bitwise OR (|) to bypass the string-concat pointer heuristic!
+        si (c >= 48) { si (c <= 57) { val -> val | (c - 48)^ } }
+        si (c >= 65) { si (c <= 70) { val -> val | (c - 55)^ } }
+        si (c >= 97) { si (c <= 102) { val -> val | (c - 87)^ } }
         i -> i + 1^
     }
     reddo val^
@@ -143,18 +144,18 @@ opus init_constants() {
     TOK_ARROW -> 28^ TOK_CARET -> 29^ TOK_DOT -> 30^ TOK_APPEND -> 31^
     TOK_EXTRACT -> 32^ TOK_AND -> 33^ TOK_OR -> 34^ TOK_CONST -> 35^
     TOK_SHARED -> 36^ TOK_OP -> 37^ TOK_COMMA -> 38^
-    
+
     EXPR_INT -> 0^ EXPR_FLOAT -> 1^ EXPR_STRING -> 2^ EXPR_VAR -> 3^
     EXPR_LIST -> 4^ EXPR_MAP -> 5^ EXPR_BINARY -> 6^ EXPR_INDEX -> 7^
     EXPR_GET -> 8^ EXPR_CALL -> 9^ EXPR_INPUT -> 10^ EXPR_READ -> 11^
     EXPR_MEASURE -> 12^
-    
+
     STMT_LET -> 0^ STMT_ASSIGN -> 1^ STMT_SET -> 2^ STMT_SET_INDEX -> 3^
     STMT_APPEND -> 4^ STMT_EXTRACT -> 5^ STMT_PRINT -> 6^ STMT_IF -> 7^
     STMT_WHILE -> 8^ STMT_FUNC -> 9^ STMT_RETURN -> 10^ STMT_IMPORT -> 11^
     STMT_BREAK -> 12^ STMT_CONTINUE -> 13^ STMT_EXPR -> 14^ STMT_CONST -> 15^
     STMT_SHARED -> 16^
-    
+
     VAL_INT -> 0^ VAL_FLOAT -> 1^ VAL_STRING -> 2^ VAL_LIST -> 3^
     VAL_MAP -> 4^ VAL_FUNC -> 5^ VAL_VOID -> 6^
 }
@@ -184,18 +185,18 @@ opus is_alpha(c) {
 opus is_alnum(c) {
     vas code : int -> codex(c)^
     vas res : int -> 0^
-    
+
     // Check Alpha
     si (is_alpha(c)) { res -> 1^ }
-    
+
     // Check Digit
     si (res == 0) {
         si (is_digit(c)) { res -> 1^ }
     }
-    
+
     // [DEBUG] Print exactly what is happening
     // scribo("  [DEBUG] is_alnum('" + c + "' / " + int_to_str(code) + ") = " + int_to_str(res))^
-    
+
     reddo res^
 }
 
@@ -266,12 +267,12 @@ opus capere_argumentum(n) {
 opus lex_source(src) {
     use_huge_lists -> 1^
     vas tokens : arr -> []^
-    use_huge_lists -> 0^ 
-    
+    use_huge_lists -> 0^
+
     vas len : int -> mensura(src)^
     scribo("[DEBUG] Source Length: " + int_to_str(len))^
     vas i : int -> 0^
-    
+
     // -- Hoisted Variables --
     vas c : str -> ""^
     vas next : str -> ""^
@@ -280,7 +281,7 @@ opus lex_source(src) {
     vas type : int -> 0^
     vas loop_c : str -> ""^
     vas adv : int -> 0^
-    
+
     // Flags
     vas run_cmt : int -> 0^
     vas run_blk : int -> 0^
@@ -295,12 +296,12 @@ opus lex_source(src) {
         c -> pars(src, i, 1)^
         // [DEBUG] Uncomment to trace infinite loops
         // scribo("[LEX LOOP] i=" + int_to_str(i) + " c='" + c + "'")^
-        
+
         // [CHAIN START]
-        si (is_space(c)) { 
-            i -> i + 1^ 
-        } 
-        aliter { 
+        si (is_space(c)) {
+            i -> i + 1^
+        }
+        aliter {
             // [BLOCK 2: COMMENTS / OP]
             si (c == "/") {
                 next -> pars(src, i+1, 1)^
@@ -314,7 +315,7 @@ opus lex_source(src) {
                             si (run_cmt) { i -> i + 1^ }
                         }
                     }
-                } aliter { 
+                } aliter {
                     si (next == "*") {
                         i -> i + 2^
                         run_blk -> 1^
@@ -333,8 +334,8 @@ opus lex_source(src) {
                         i -> i + 1^
                     }
                 }
-            } 
-            aliter { 
+            }
+            aliter {
                 // [BLOCK 3: STRINGS]
                 si (c == "\"") {
                     i -> i + 1^
@@ -363,14 +364,14 @@ opus lex_source(src) {
                     }
                     tokens << make_token(TOK_STRING, txt)^
                     i -> i + 1^
-                } 
-                aliter { 
+                }
+                aliter {
                     // [BLOCK 4: NUMBERS]
                     // [BLOCK 4: NUMBERS & HEX]
                     si (is_digit(c)) {
                         start -> i^
                         vas is_hex : int -> 0^
-                        
+
                         // 1. Check for Hex Prefix (0x or 0X)
                         si (c == "0") {
                             vas next_char : str -> pars(src, i+1, 1)^
@@ -394,7 +395,7 @@ opus lex_source(src) {
                             }
                             vas hex_str : str -> pars(src, start, i - start)^
                             tokens << make_token(TOK_INT, int_to_str(hex_to_dec(hex_str)))^
-                        } 
+                        }
                         // 3. Handle Standard Integers / Decimals
                         aliter {
                             vas run_num : int -> 1^
@@ -402,12 +403,12 @@ opus lex_source(src) {
                                 si (i >= len) { run_num -> 0^ }
                                 si (run_num) {
                                     loop_c -> pars(src, i, 1)^
-                                    
+
                                     // Safe Logic Flag (Bypasses 'vel' precedence bug)
                                     vas keep : int -> 0^
                                     si (is_digit(loop_c)) { keep -> 1^ }
                                     si (loop_c == ".") { keep -> 1^ }
-                                    
+
                                     si (keep == 0) { run_num -> 0^ }
                                     si (run_num) { i -> i + 1^ }
                                 }
@@ -416,7 +417,7 @@ opus lex_source(src) {
                             tokens << make_token(TOK_INT, txt)^
                         }
                     }
-                    aliter { 
+                    aliter {
                         // [BLOCK 5: IDENTIFIERS]
                         si (is_alpha(c)) {
                             start -> i^
@@ -431,13 +432,13 @@ opus lex_source(src) {
                                     si (lcode >= 65) { si (lcode <= 90) { ok -> 1^ } }
                                     si (lcode >= 97) { si (lcode <= 122) { ok -> 1^ } }
                                     si (lcode == 95) { ok -> 1^ }
-                                    
+
                                     si (ok == 0) { run_id -> 0^ }
                                     si (run_id) { i -> i + 1^ }
                                 }
                             }
                             txt -> pars(src, start, i - start)^
-                            type -> 4^ 
+                            type -> 4^
                             si (txt == "vas") { type -> 5^ }
                             si (txt == "idea") { type -> 5^ }
                             si (txt == "umbra") { type -> 5^ }
@@ -460,7 +461,7 @@ opus lex_source(src) {
                             si (txt == "verum") { type -> 1^ txt -> "1"^ }
                             si (txt == "falsum") { type -> 1^ txt -> "0"^ }
                             tokens << make_token(type, txt)^
-                        } 
+                        }
                         aliter {
                             // [BLOCK 6: SYMBOLS]
                             type -> 0^
@@ -475,11 +476,11 @@ opus lex_source(src) {
                             si (c == "^") { type -> TOK_CARET^ }
                             si (c == ".") { type -> TOK_DOT^ }
                             si (c == ",") { type -> TOK_COMMA^ }
-                            
+
                             si (type == 0) {
                                 type -> TOK_OP^
                                 next -> pars(src, i+1, 1)^
-                                
+
                                 // [FIX] Nested SI to avoid ET precedence issues
                                 si (c == "-") {
                                     si (next == ">") { type -> TOK_ARROW^ c -> "->"^ adv -> 2^ }
@@ -508,7 +509,7 @@ opus lex_source(src) {
                                     aliter { si (next == "=") { type -> TOK_OP^ c -> ">="^ adv -> 2^ } }
                                 }
                             }
-                            
+
                             tokens << make_token(type, c)^
                             i -> i + adv^
                         }
@@ -531,10 +532,10 @@ opus peek() {
     reddo global_tokens[p_pos]^
 }
 
-opus advance() { 
+opus advance() {
     vas t : obj -> peek()^
     si (t["type"] != TOK_EOF) { p_pos -> p_pos + 1^ }
-    reddo t^ 
+    reddo t^
 }
 
 opus consume(type) {
@@ -554,8 +555,8 @@ opus parse_primary() {
     vas t : obj -> peek()^
     si (consume(TOK_INT)) { reddo { "type": EXPR_INT, "val": t["text"] }^ }
     si (consume(TOK_STRING)) { reddo { "type": EXPR_STRING, "val": t["text"] }^ }
-    
-    si (consume(TOK_IDENT)) { 
+
+    si (consume(TOK_IDENT)) {
         vas name : str -> t["text"]^
         si (consume(TOK_LPAREN)) {
             vas args : arr -> []^
@@ -566,15 +567,15 @@ opus parse_primary() {
             expect(TOK_RPAREN)^
             reddo { "type": EXPR_CALL, "name": name, "args": args }^
         }
-        reddo { "type": EXPR_VAR, "name": name }^ 
+        reddo { "type": EXPR_VAR, "name": name }^
     }
-    
+
     si (consume(TOK_LPAREN)) {
         vas expr : obj -> parse_expr()^
         expect(TOK_RPAREN)^
         reddo expr^
     }
-    
+
     si (consume(TOK_LBRACKET)) {
         vas items : arr -> []^
         si (peek()["type"] != TOK_RBRACKET) {
@@ -584,12 +585,12 @@ opus parse_primary() {
         expect(TOK_RBRACKET)^
         reddo { "type": EXPR_LIST, "items": items }^
     }
-    
+
     si (consume(TOK_LBRACE)) {
         vas keys : arr -> []^
         vas vals : arr -> []^
         dum (peek()["type"] != TOK_RBRACE) {
-            vas k : obj -> advance()^ 
+            vas k : obj -> advance()^
             expect(TOK_COLON)^
             vas v : obj -> parse_expr()^
             keys << k["text"]^
@@ -599,7 +600,7 @@ opus parse_primary() {
         expect(TOK_RBRACE)^
         reddo { "type": EXPR_MAP, "keys": keys, "vals": vals }^
     }
-    
+
     si (t["type"] == TOK_OP et t["text"] == "-") {
         advance()^
         vas right : obj -> parse_primary()^
@@ -611,7 +612,7 @@ opus parse_primary() {
         vas right : obj -> parse_primary()^
         reddo { "type": EXPR_BINARY, "op": "==", "left": right, "right": { "type": EXPR_INT, "val": "0" } }^
     }
-    
+
     si (t["type"] != TOK_EOF) { advance()^ }
     error_report("Unexpected token: " + t["text"])^
     reddo { "type": EXPR_INT, "val": "0" }^
@@ -619,11 +620,11 @@ opus parse_primary() {
 
 opus parse_postfix() {
     vas expr : obj -> parse_primary()^
-    
+
     // [FIX] Use a manual flag instead of 'dum(1)' + 'abrumpere'
     // 'abrumpere' fails inside nested 'aliter' blocks
     vas running : int -> 1^
-    
+
     dum (running) {
         si (consume(TOK_LBRACKET)) {
             vas idx : obj -> parse_expr()^
@@ -633,9 +634,9 @@ opus parse_postfix() {
             si (consume(TOK_DOT)) {
                 vas t : obj -> advance()^
                 expr -> { "type": EXPR_GET, "obj": expr, "name": t["text"] }^
-            } aliter { 
+            } aliter {
                 // Stop the loop manually
-                running -> 0^ 
+                running -> 0^
             }
         }
     }
@@ -762,13 +763,13 @@ opus parse_expr() {
 opus parse_stmt() {
     scribo("[DEBUG] Parsing stmt...")^
     vas t : obj -> peek()^
-    
+
     vas stmt_type : int -> -1^
-    
+
     si (t["type"] == TOK_LET) { stmt_type -> STMT_LET^ consume(TOK_LET)^ }
     aliter { si (t["type"] == TOK_SHARED) { stmt_type -> STMT_SHARED^ consume(TOK_SHARED)^ }
     aliter { si (t["type"] == TOK_CONST) { stmt_type -> STMT_CONST^ consume(TOK_CONST)^ } } }
-    
+
     si (stmt_type != -1) {
         vas name : obj -> advance()^
         expect(TOK_COLON)^
@@ -778,7 +779,7 @@ opus parse_stmt() {
         expect(TOK_CARET)^
         reddo { "type": stmt_type, "name": name["text"], "val": val }^
     }
-    
+
     si (consume(TOK_PRINT)) {
         expect(TOK_LPAREN)^
         vas val : obj -> parse_expr()^
@@ -786,16 +787,16 @@ opus parse_stmt() {
         expect(TOK_CARET)^
         reddo { "type": STMT_PRINT, "val": val }^
     }
-    
+
     si (consume(TOK_IF)) {
         expect(TOK_LPAREN)^
         vas cond : obj -> parse_expr()^
         expect(TOK_RPAREN)^
         expect(TOK_LBRACE)^
         vas body : arr -> []^
-        dum (peek()["type"] != TOK_RBRACE) { 
+        dum (peek()["type"] != TOK_RBRACE) {
             si (peek()["type"] == TOK_CARET) { advance()^ pergere^ }
-            body << parse_stmt()^ 
+            body << parse_stmt()^
         }
         expect(TOK_RBRACE)^
         vas else_body : arr -> []^
@@ -805,16 +806,16 @@ opus parse_stmt() {
                 else_body << parse_stmt()^
             } aliter {
                 expect(TOK_LBRACE)^
-                dum (peek()["type"] != TOK_RBRACE) { 
+                dum (peek()["type"] != TOK_RBRACE) {
                     si (peek()["type"] == TOK_CARET) { advance()^ pergere^ }
-                    else_body << parse_stmt()^ 
+                    else_body << parse_stmt()^
                 }
                 expect(TOK_RBRACE)^
             }
         }
         reddo { "type": STMT_IF, "cond": cond, "body": body, "else": else_body }^
     }
-    
+
     si (consume(TOK_WHILE)) {
         expect(TOK_LPAREN)^
         vas cond : obj -> parse_expr()^
@@ -825,7 +826,7 @@ opus parse_stmt() {
         expect(TOK_RBRACE)^
         reddo { "type": STMT_WHILE, "cond": cond, "body": body }^
     }
-    
+
     si (consume(TOK_OPUS)) {
         vas name : obj -> advance()^
         expect(TOK_LPAREN)^
@@ -845,7 +846,7 @@ opus parse_stmt() {
         expect(TOK_RBRACE)^
         reddo { "type": STMT_FUNC, "name": name["text"], "params": params, "body": body }^
     }
-    
+
     si (consume(TOK_REDDO)) {
         vas val : obj -> parse_expr()^
         expect(TOK_CARET)^
@@ -868,7 +869,7 @@ opus parse_stmt() {
         expect(TOK_CARET)^
         reddo { "type": STMT_IMPORT, "val": path }^
     }
-    
+
     si (t["type"] == TOK_IDENT) {
         vas next_idx : int -> p_pos + 1^
         si (next_idx >= mensura(global_tokens)) {
@@ -876,17 +877,17 @@ opus parse_stmt() {
              reddo { "type": -1 }^
         }
         vas next : obj -> global_tokens[next_idx]^
-        
+
         si (next["type"] == TOK_ARROW) {
             vas name : obj -> advance()^
-            advance()^ 
+            advance()^
             vas val : obj -> parse_expr()^
             expect(TOK_CARET)^
-            reddo { "type": STMT_ASSIGN, "name": name["text"], "val": val }^ 
+            reddo { "type": STMT_ASSIGN, "name": name["text"], "val": val }^
         }
         si (next["type"] == TOK_APPEND) {
             vas name : obj -> advance()^
-            advance()^ 
+            advance()^
             vas val : obj -> parse_expr()^
             expect(TOK_CARET)^
             reddo { "type": STMT_APPEND, "name": name["text"], "val": val }^
@@ -908,7 +909,7 @@ opus parse_stmt() {
             reddo { "type": STMT_EXPR, "expr": expr }^
         }
     }
-    
+
     si (t["type"] != TOK_EOF) { advance()^ }
     reddo { "type": -1 }^
 }
@@ -978,11 +979,11 @@ opus get_var_ptr(name) {
     // 1. Try Local
     vas ptr : str -> var_map[name]^
     si (mensura(ptr) > 0) { reddo ptr^ }
-    
+
     // 2. Try Global
     ptr -> global_map[name]^
     si (mensura(ptr) > 0) { reddo ptr^ }
-    
+
     // 3. Error (Return empty, will cause crash but we can debug)
     reddo ""^
 }
@@ -993,10 +994,10 @@ opus compile_expr(node) {
     si (node["type"] == EXPR_INT) { reddo node["val"]^ }
 
     si (node["type"] == EXPR_VAR) {
-        vas ptr : str -> get_var_ptr(node["name"])^ 
-        
+        vas ptr : str -> get_var_ptr(node["name"])^
+
         // Safety Check
-        si (mensura(ptr) == 0) { 
+        si (mensura(ptr) == 0) {
             scribo("💀 FATAL: Undefined variable '" + node["name"] + "'")^
             reddo "0"^
         }
@@ -1017,46 +1018,112 @@ opus compile_expr(node) {
     }
 
     si (node["type"] == EXPR_BINARY) {
-        vas lhs : str -> compile_expr(node["left"])^
-        vas rhs : str -> compile_expr(node["right"])^
         vas op : str -> node["op"]^
-        vas res : str -> next_reg()^
+        
+        // [COMPILER UPGRADE: TRUE SHORT-CIRCUIT EVALUATION (ZERO-STACK GROWTH)]
+        si (op == "et") {
+            // Allocate a permanent, static global variable at compile time!
+            str_count -> str_count + 1^
+            vas g_ptr : str -> "@.sc." + int_to_str(str_count)^
+            out_data -> out_data + g_ptr + " = global i64 0" + signum_ex(10)^
 
-        vas defined : int -> 0^
-        
-        // [MATH & BITWISE CASCADE]
-        si (op == "+") { emit(res + " = call i64 @_add(i64 " + lhs + ", i64 " + rhs + ")")^ defined -> 1^ }
-        aliter { si (op == "-") { emit(res + " = sub i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "*") { emit(res + " = mul i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "/") { emit(res + " = sdiv i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "%") { emit(res + " = srem i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "&") { emit(res + " = and i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "|") { emit(res + " = or i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "^") { emit(res + " = xor i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "xor") { emit(res + " = xor i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "~") { emit(res + " = xor i64 " + lhs + ", -1")^ defined -> 1^ }
-        aliter { si (op == "<<<") { emit(res + " = shl i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == ">>>") { emit(res + " = lshr i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "et") { emit(res + " = and i64 " + lhs + ", " + rhs)^ defined -> 1^ }
-        aliter { si (op == "vel") { emit(res + " = or i64 " + lhs + ", " + rhs)^ defined -> 1^ } } } } } } } } } } } } } }
-        
-        // [COMPARISONS]
-        si (defined == 0) {
-            si (op == "==") { 
-                emit(res + " = call i64 @_eq(i64 " + lhs + ", i64 " + rhs + ")")^ 
+            vas l_lhs : str -> compile_expr(node["left"])^
+            vas l_res : str -> next_reg()^
+            vas l_right : str -> next_label()^
+            vas l_end : str -> next_label()^
+            
+            // Reuse the exact same memory address infinitely!
+            emit("store i64 0, i64* " + g_ptr)^
+            
+            vas bool_l : str -> next_reg()^
+            emit(bool_l + " = icmp ne i64 " + l_lhs + ", 0")^
+            emit("br i1 " + bool_l + ", label %" + l_right + ", label %" + l_end)^
+            
+            emit_raw(l_right + ":")^
+            vas l_rhs : str -> compile_expr(node["right"])^
+            vas bool_r : str -> next_reg()^
+            emit(bool_r + " = icmp ne i64 " + l_rhs + ", 0")^
+            vas final_b : str -> next_reg()^
+            emit(final_b + " = zext i1 " + bool_r + " to i64")^
+            emit("store i64 " + final_b + ", i64* " + g_ptr)^
+            emit("br label %" + l_end)^
+            
+            emit_raw(l_end + ":")^
+            emit(l_res + " = load i64, i64* " + g_ptr)^
+            reddo l_res^
+        }
+        aliter si (op == "vel") {
+            // Allocate a permanent, static global variable at compile time!
+            str_count -> str_count + 1^
+            vas g_ptr : str -> "@.sc." + int_to_str(str_count)^
+            out_data -> out_data + g_ptr + " = global i64 0" + signum_ex(10)^
+
+            vas v_lhs : str -> compile_expr(node["left"])^
+            vas v_res : str -> next_reg()^
+            vas v_right : str -> next_label()^
+            vas v_end : str -> next_label()^
+            
+            emit("store i64 1, i64* " + g_ptr)^
+            
+            vas v_bool_l : str -> next_reg()^
+            emit(v_bool_l + " = icmp eq i64 " + v_lhs + ", 0")^
+            emit("br i1 " + v_bool_l + ", label %" + v_right + ", label %" + v_end)^
+            
+            emit_raw(v_right + ":")^
+            vas v_rhs : str -> compile_expr(node["right"])^
+            vas v_bool_r : str -> next_reg()^
+            emit(v_bool_r + " = icmp ne i64 " + v_rhs + ", 0")^
+            vas v_final_b : str -> next_reg()^
+            emit(v_final_b + " = zext i1 " + v_bool_r + " to i64")^
+            emit("store i64 " + v_final_b + ", i64* " + g_ptr)^
+            emit("br label %" + v_end)^
+            
+            emit_raw(v_end + ":")^
+            emit(v_res + " = load i64, i64* " + g_ptr)^
+            reddo v_res^
+        }
+        aliter {
+            // [STANDARD BINARY OPS - FLAT ARCHITECTURE]
+            vas lhs : str -> compile_expr(node["left"])^
+            vas rhs : str -> compile_expr(node["right"])^
+            vas res : str -> next_reg()^
+            vas defined : int -> 0^
+
+            si (op == "+") { emit(res + " = call i64 @_add(i64 " + lhs + ", i64 " + rhs + ")")^ defined -> 1^ }
+            si (defined == 0) { si (op == "-") { emit(res + " = sub i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "*") { emit(res + " = mul i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "/") { emit(res + " = sdiv i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "%") { emit(res + " = srem i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "&") { emit(res + " = and i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "|") { emit(res + " = or i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "^") { emit(res + " = xor i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "xor") { emit(res + " = xor i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == "~") { emit(res + " = xor i64 " + lhs + ", -1")^ defined -> 1^ } }
+            si (defined == 0) { si (op == "<<<") { emit(res + " = shl i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+            si (defined == 0) { si (op == ">>>") { emit(res + " = lshr i64 " + lhs + ", " + rhs)^ defined -> 1^ } }
+
+            // [COMPARISONS]
+            si (defined == 0) {
+                si (op == "==") {
+                    emit(res + " = call i64 @_eq(i64 " + lhs + ", i64 " + rhs + ")")^
+                    defined -> 1^
+                }
             }
-            aliter { si (op == "!=") {
-                vas tmp : str -> next_reg()^
-                emit(tmp + " = call i64 @_eq(i64 " + lhs + ", i64 " + rhs + ")")^
-                emit(res + " = xor i64 " + tmp + ", 1")^
+            si (defined == 0) {
+                si (op == "!=") {
+                    vas tmp : str -> next_reg()^
+                    emit(tmp + " = call i64 @_eq(i64 " + lhs + ", i64 " + rhs + ")")^
+                    emit(res + " = xor i64 " + tmp + ", 1")^
+                    defined -> 1^
+                }
             }
-            aliter {
+            si (defined == 0) {
                 vas cmp : str -> ""^
                 si (op == "<")  { cmp -> "slt"^ }
-                aliter { si (op == ">")  { cmp -> "sgt"^ }
-                aliter { si (op == "<=") { cmp -> "sle"^ }
-                aliter { si (op == ">=") { cmp -> "sge"^ } } } }
-                
+                si (op == ">")  { cmp -> "sgt"^ }
+                si (op == "<=") { cmp -> "sle"^ }
+                si (op == ">=") { cmp -> "sge"^ }
+
                 si (mensura(cmp) > 0) {
                     vas b : str -> next_reg()^
                     emit(b + " = icmp " + cmp + " i64 " + lhs + ", " + rhs)^
@@ -1065,16 +1132,16 @@ opus compile_expr(node) {
                     // Fallback safety
                     emit(res + " = add i64 0, 0")^
                 }
-            } }
+            }
+            reddo res^
         }
-        reddo res^
     }
 
     // 5. LISTS ([1, 2, 3])
     si (node["type"] == EXPR_LIST) {
         vas res : str -> next_reg()^
         emit(res + " = call i64 @_list_new()")^
-        
+
         vas items : arr -> node["items"]^
         vas i : int -> 0^
         dum (i < mensura(items)) {
@@ -1089,10 +1156,10 @@ opus compile_expr(node) {
     si (node["type"] == EXPR_MAP) {
         vas res : str -> next_reg()^
         emit(res + " = call i64 @_map_new()")^
-        
+
         vas keys : arr -> node["keys"]^
         vas vals : arr -> node["vals"]^ // [FIX] "values" -> "vals"
-        
+
         vas i : int -> 0^
         dum (i < mensura(keys)) {
             // Compile Key (String Literal)
@@ -1103,11 +1170,11 @@ opus compile_expr(node) {
             emit(key_reg + " = getelementptr [" + int_to_str(len) + " x i8], [" + int_to_str(len) + " x i8]* " + key_ptr + ", i64 0, i64 0")^
             vas key_int : str -> next_reg()^
             emit(key_int + " = ptrtoint i8* " + key_reg + " to i64")^
-            
+
             // Compile Value
             vas v : obj -> vals[i]^
             vas val_reg : str -> compile_expr(v)^
-            
+
             emit("call i64 @_map_set(i64 " + res + ", i64 " + key_int + ", i64 " + val_reg + ")")^
             i -> i + 1^
         }
@@ -1118,7 +1185,7 @@ opus compile_expr(node) {
     si (node["type"] == EXPR_INDEX vel node["type"] == EXPR_GET) {
         vas obj_node : obj -> {}^
         vas idx_node : obj -> {}^
-        
+
         si (node["type"] == EXPR_INDEX) {
             obj_node -> node["obj"]^  // [FIX] "list" -> "obj"
             idx_node -> node["idx"]^  // [FIX] "index" -> "idx"
@@ -1128,10 +1195,10 @@ opus compile_expr(node) {
             // Create a temporary STRING node for the property name
             idx_node -> { "type": EXPR_STRING, "val": node["name"] }^
         }
-        
+
         vas obj_reg : str -> compile_expr(obj_node)^
         vas idx_reg : str -> compile_expr(idx_node)^
-        
+
         vas res : str -> next_reg()^
         emit(res + " = call i64 @_get(i64 " + obj_reg + ", i64 " + idx_reg + ")")^
         reddo res^
@@ -1160,7 +1227,7 @@ opus compile_expr(node) {
             emit(ptr_reg + " = inttoptr i64 " + addr_reg + " to ptr")^
             vas trunc_reg : str -> next_reg()^
             emit(trunc_reg + " = trunc i64 " + val_reg + " to i8")^
-            emit("store i8 " + trunc_reg + ", ptr " + ptr_reg)^
+            emit("store volatile i8 " + trunc_reg + ", ptr " + ptr_reg)^
             reddo "0"^
         }
 
@@ -1181,6 +1248,89 @@ opus compile_expr(node) {
             reddo res^
         }
 
+        // [OS BARE METAL] Hardware Port Output (outb)
+        si (name == "port_out") {
+            vas port_reg : str -> compile_expr(node["args"][0])^
+            vas val_reg : str -> compile_expr(node["args"][1])^
+            
+            vas port16 : str -> next_reg()^
+            emit(port16 + " = trunc i64 " + port_reg + " to i16")^
+            vas val8 : str -> next_reg()^
+            emit(val8 + " = trunc i64 " + val_reg + " to i8")^
+            
+            emit("call void asm sideeffect \"outb %al, %dx\", \"{al},{dx},~{dirflag},~{fpsr},~{flags}\"(i8 " + val8 + ", i16 " + port16 + ")")^
+            reddo "0"^
+        }
+
+        // [OS BARE METAL] Hardware Port Input (inb)
+        si (name == "port_in") {
+            vas port_reg : str -> compile_expr(node["args"][0])^
+            
+            vas port16 : str -> next_reg()^
+            emit(port16 + " = trunc i64 " + port_reg + " to i16")^
+            
+            vas res8 : str -> next_reg()^
+            emit(res8 + " = call i8 asm sideeffect \"inb %dx, %al\", \"={al},{dx},~{dirflag},~{fpsr},~{flags}\"(i16 " + port16 + ")")^
+            
+            vas res64 : str -> next_reg()^
+            emit(res64 + " = zext i8 " + res8 + " to i64")^
+            reddo res64^
+        }
+
+        // [OS BARE METAL] 32-Bit Hardware Port Output (outl)
+        si (name == "port_out_32") {
+            vas port_reg : str -> compile_expr(node["args"][0])^
+            vas val_reg : str -> compile_expr(node["args"][1])^
+            
+            vas port16 : str -> next_reg()^
+            emit(port16 + " = trunc i64 " + port_reg + " to i16")^
+            vas val32 : str -> next_reg()^
+            emit(val32 + " = trunc i64 " + val_reg + " to i32")^
+            
+            emit("call void asm sideeffect \"outl %eax, %dx\", \"{eax},{dx},~{dirflag},~{fpsr},~{flags}\"(i32 " + val32 + ", i16 " + port16 + ")")^
+            reddo "0"^
+        }
+
+        // [OS BARE METAL] 32-Bit Hardware Port Input (inl)
+        si (name == "port_in_32") {
+            vas port_reg : str -> compile_expr(node["args"][0])^
+            
+            vas port16 : str -> next_reg()^
+            emit(port16 + " = trunc i64 " + port_reg + " to i16")^
+            
+            vas res32 : str -> next_reg()^
+            emit(res32 + " = call i32 asm sideeffect \"inl %dx, %eax\", \"={eax},{dx},~{dirflag},~{fpsr},~{flags}\"(i16 " + port16 + ")")^
+            
+            vas res64 : str -> next_reg()^
+            emit(res64 + " = zext i32 " + res32 + " to i64")^
+            reddo res64^
+        }
+
+        // [OS BARE METAL] 32-Bit Hardware Memory Read (MMIO)
+        si (name == "mem_read_32") {
+            vas addr_reg : str -> compile_expr(node["args"][0])^
+            vas ptr_reg : str -> next_reg()^
+            emit(ptr_reg + " = inttoptr i64 " + addr_reg + " to i32*")^
+            vas val32 : str -> next_reg()^
+            // 'volatile' forces the CPU to actually read the hardware, bypassing cache!
+            emit(val32 + " = load volatile i32, i32* " + ptr_reg)^
+            vas res64 : str -> next_reg()^
+            emit(res64 + " = zext i32 " + val32 + " to i64")^
+            reddo res64^
+        }
+
+        // [OS BARE METAL] 32-Bit Hardware Memory Write (MMIO)
+        si (name == "mem_write_32") {
+            vas addr_reg : str -> compile_expr(node["args"][0])^
+            vas val_reg : str -> compile_expr(node["args"][1])^
+            vas ptr_reg : str -> next_reg()^
+            emit(ptr_reg + " = inttoptr i64 " + addr_reg + " to i32*")^
+            vas val32 : str -> next_reg()^
+            emit(val32 + " = trunc i64 " + val_reg + " to i32")^
+            emit("store volatile i32 " + val32 + ", i32* " + ptr_reg)^
+            reddo "0"^
+        }
+
         // [OS BARE METAL SYSCALL GATEWAY]
         // Example: imperium_kernel(1, 1, text, len) // sys_write
         si (name == "imperium_kernel") {
@@ -1193,7 +1343,7 @@ opus compile_expr(node) {
             vas a4 : str -> "0"^ si (mensura(args) > 4) { a4 -> compile_expr(args[4])^ }
             vas a5 : str -> "0"^ si (mensura(args) > 5) { a5 -> compile_expr(args[5])^ }
             vas a6 : str -> "0"^ si (mensura(args) > 6) { a6 -> compile_expr(args[6])^ }
-            
+
             vas res : str -> next_reg()^
             emit(res + " = call i64 @syscall6(i64 " + a0 + ", i64 " + a1 + ", i64 " + a2 + ", i64 " + a3 + ", i64 " + a4 + ", i64 " + a5 + ", i64 " + a6 + ")")^
             reddo res^
@@ -1222,7 +1372,7 @@ opus compile_expr(node) {
         }
         reddo res^
     }
-    
+
     reddo "0"^
 }
 
@@ -1236,25 +1386,25 @@ opus compile_stmt(node) {
         vas path_node : obj -> node["val"]^
         si (path_node["type"] == EXPR_STRING) {
             // Compiler uses its own runtime to read the file
-            vas f_src : str -> revelare(path_node["val"])^ 
+            vas f_src : str -> revelare(path_node["val"])^
             si (mensura(f_src) > 0) {
                 // Save current state
                 vas old_tokens : arr -> global_tokens^
                 vas old_pos : int -> p_pos^
-                
+
                 // Switch context to new file
                 global_tokens -> lex_source(f_src)^
                 p_pos -> 0^
                 vas link_stmts : arr -> []^
-                
+
                 dum (peek()["type"] != TOK_EOF) {
                     si (peek()["type"] == TOK_CARET) { advance()^ }
                     aliter { link_stmts << parse_stmt()^ }
                 }
-                
+
                 // Compile the linked file into current LLVM context
                 compile_block(link_stmts)^
-                
+
                 // Restore state
                 global_tokens -> old_tokens^
                 p_pos -> old_pos^
@@ -1278,14 +1428,14 @@ opus compile_stmt(node) {
         vas val : str -> compile_expr(node["val"])^
         vas idx : str -> compile_expr(node["idx"])^
         vas list_ptr : str -> get_var_ptr(node["name"])^
-        
+
         si (mensura(list_ptr) == 0) {
              scribo("💀 FATAL: Index set on undefined variable '" + node["name"] + "'")^
         } aliter {
              // 1. Load the list handle (i64) from the variable
              vas list_reg : str -> next_reg()^
              emit(list_reg + " = load i64, i64* " + list_ptr)^
-             
+
              // 2. Call the runtime helper to do the heavy lifting
              // We do NOT need manual getelementptr/inttoptr here because _list_set does it.
              emit("call i64 @_set(i64 " + list_reg + ", i64 " + idx + ", i64 " + val + ")")^
@@ -1295,7 +1445,7 @@ opus compile_stmt(node) {
     si (node["type"] == STMT_ASSIGN) {
         vas val : str -> compile_expr(node["val"])^
         vas ptr : str -> get_var_ptr(node["name"])^
-        si (mensura(ptr) == 0) { 
+        si (mensura(ptr) == 0) {
              scribo("💀 FATAL: Assignment to undefined variable '" + node["name"] + "'")^
         } aliter {
              emit("store i64 " + val + ", i64* " + ptr)^
@@ -1305,13 +1455,13 @@ opus compile_stmt(node) {
     si (node["type"] == STMT_APPEND) {
         vas val : str -> compile_expr(node["val"])^
         vas list_ptr : str -> get_var_ptr(node["name"])^
-        
+
         si (mensura(list_ptr) == 0) {
              scribo("💀 FATAL: Append to undefined variable '" + node["name"] + "'")^
         } aliter {
              vas list_reg : str -> next_reg()^
              emit(list_reg + " = load i64, i64* " + list_ptr)^
-             
+
              // [FIX] Use polymorphic append to flatten lists
              emit("call i64 @_append_poly(i64 " + list_reg + ", i64 " + val + ")")^
         }
@@ -1319,13 +1469,13 @@ opus compile_stmt(node) {
 
     si (node["type"] == STMT_PRINT) {
         // [DEBUG] Confirm we are compiling this
-        scribo("[DEBUG] Compiling STMT_PRINT")^ 
-        
+        scribo("[DEBUG] Compiling STMT_PRINT")^
+
         vas val : str -> compile_expr(node["val"])^
         emit("call i64 @print_any(i64 " + val + ")")^
     }
 
-    
+
 
     si (node["type"] == STMT_BREAK) {
         vas len : int -> mensura(loop_end_stack)^
@@ -1349,7 +1499,7 @@ opus compile_stmt(node) {
         vas val : str -> compile_expr(node["val"])^
         emit("ret i64 " + val)^
     }
-    
+
     si (node["type"] == STMT_EXPR) {
         compile_expr(node["expr"])^
     }
@@ -1361,27 +1511,27 @@ opus compile_stmt(node) {
         vas l_then : str -> next_label()^
         vas l_else : str -> next_label()^
         vas l_end : str -> next_label()^
-        
+
         vas has_else : int -> mensura(node["else"]) > 0^
         si (has_else) { emit("br i1 " + bool + ", label %" + l_then + ", label %" + l_else)^ }
         aliter { emit("br i1 " + bool + ", label %" + l_then + ", label %" + l_end)^ }
-        
+
         emit_raw(l_then + ":")^
         block_terminated -> 0^
         compile_block(node["body"])^
         si (block_terminated == 0) { emit("br label %" + l_end)^ }
-        
+
         si (has_else) {
             emit_raw(l_else + ":")^
             block_terminated -> 0^
             compile_block(node["else"])^
             si (block_terminated == 0) { emit("br label %" + l_end)^ }
         }
-        
+
         emit_raw(l_end + ":")^
         block_terminated -> 0^
     }
-    
+
     si (node["type"] == STMT_WHILE) {
         vas l_cond : str -> next_label()^
         vas l_body : str -> next_label()^
@@ -1402,17 +1552,19 @@ opus compile_stmt(node) {
         compile_block(node["body"])^
         emit("br label %" + l_cond)^
         emit_raw(l_end + ":")^
-        
+
+        block_terminated -> 0^
+
         // [FIX] Pop labels (Manual extraction since we don't have pop())
         vas len : int -> mensura(loop_cond_stack)^
         vas extract_dummy : str -> ""^
-        
+
         // Remove last item from cond stack
         vas popped_cond : arr -> []^
         vas i : int -> 0^
         dum (i < len - 1) { popped_cond << loop_cond_stack[i]^ i -> i + 1^ }
         loop_cond_stack -> popped_cond^
-        
+
         // Remove last item from end stack
         vas popped_end : arr -> []^
         i -> 0^
@@ -1424,8 +1576,8 @@ opus compile_stmt(node) {
 opus compile_block(stmts) {
     vas i : int -> 0^
     dum (i < mensura(stmts)) {
-        si (block_terminated == 0) { 
-            compile_stmt(stmts[i])^ 
+        si (block_terminated == 0) {
+            compile_stmt(stmts[i])^
         }
         i -> i + 1^
     }
@@ -1435,12 +1587,12 @@ opus scan_for_vars(stmts) {
     vas i : int -> 0^
     dum (i < mensura(stmts)) {
         vas s : obj -> stmts[i]^
-        
+
         // 1. Found a Variable Declaration? Allocate it NOW.
         si (s["type"] == STMT_LET) {
             vas nm : str -> s["name"]^
             vas ptr : str -> var_map[nm]^
-            
+
             // Only allocate if not already allocated in this function scope
             si (mensura(ptr) == 0) {
                 ptr -> "%ptr_" + nm^
@@ -1448,35 +1600,35 @@ opus scan_for_vars(stmts) {
                 var_map[nm] -> ptr^
             }
         }
-        
+
         // 2. Recurse into IF blocks (FIXED: "then" -> "body")
         si (s["type"] == STMT_IF) {
             scan_for_vars(s["body"])^  // <--- CRITICAL FIX WAS HERE
             si (mensura(s["else"]) > 0) { scan_for_vars(s["else"])^ }
         }
-        
+
         // 3. Recurse into WHILE blocks
         si (s["type"] == STMT_WHILE) {
             scan_for_vars(s["body"])^
         }
-        
+
         i -> i + 1^
     }
 }
 
 opus compile_func(node) {
     vas name : str -> node["name"]^
-    
+
     // [CRITICAL FIX] Rename user 'main' to 'achlys_main'
     si (name == "main") { name -> "achlys_main"^ }
 
     vas header : str -> "define i64 @" + name + "("^
     vas params : arr -> node["params"]^
     vas i : int -> 0^
-    
+
     // RESET LOCAL STATE
-    var_map -> {}^ 
-    reg_count -> 0^ 
+    var_map -> {}^
+    reg_count -> 0^
 
     dum (i < mensura(params)) {
         header -> header + "i64 %arg_" + params[i]^
@@ -1485,13 +1637,13 @@ opus compile_func(node) {
     }
     header -> header + ") {"^
     emit_raw(header)^
-    
+
     // 1. ALLOCATE PARAMETERS
     i -> 0^
     dum (i < mensura(params)) {
         vas p : str -> params[i]^
         vas ptr : str -> "%ptr_" + p^
-        
+
         emit(ptr + " = alloca i64")^
         emit("store i64 %arg_" + p + ", i64* " + ptr)^
         var_map[p] -> ptr^
@@ -1504,7 +1656,7 @@ opus compile_func(node) {
 
     // 3. COMPILE BODY
     compile_block(node["body"])^
-    
+
     emit("ret i64 0")^
     emit_raw("}")^
 }
@@ -1517,14 +1669,17 @@ opus compile_func(node) {
 opus get_llvm_header(is_freestanding, is_arm64) {
     vas NL : str -> signum_ex(10)^
     vas s : str -> "; ModuleID = 'achlys_kernel'" + NL^
-    
+
+    vas ptr_thresh : str -> "4294967296"^
+    si (is_freestanding) { ptr_thresh -> "65536"^ }
+
     vas arch : str -> "x86_64-pc-linux-gnu"^
     si (is_arm64) { arch -> "aarch64-linux-android"^ }
     s -> s + "target triple = \"" + arch + "\"" + NL^
-    
+
     si (is_freestanding == 0) {
         s -> s + "declare i32 @printf(i8*, ...)" + NL^
-        s -> s + "declare i32 @sprintf(i8*, i8*, ...)" + NL^
+       // s -> s + "declare i32 @sprintf(i8*, i8*, ...)" + NL^
         s -> s + "declare i32 @fflush(i8*)" + NL^
         s -> s + "declare i64 @malloc(i64)" + NL^
         s -> s + "declare i8* @realloc(i8*, i64)" + NL^
@@ -1540,6 +1695,10 @@ opus get_llvm_header(is_freestanding, is_arm64) {
         s -> s + "declare i32 @usleep(i32)" + NL^
         s -> s + "declare i8* @strtok(i8*, i8*)" + NL^
     }
+
+    s -> s + "declare i64 @fast_memcpy(i64, i64, i64)" + NL^
+    s -> s + "declare i64 @fast_fill32(i64, i64, i64)" + NL^
+    s -> s + "declare i64 @get_system_ticks()" + NL^
 
     // --- GLOBALS ---
     s -> s + "@.fmt_int = private unnamed_addr constant [5 x i8] c\"%ld\\0A\\00\", align 8" + NL^
@@ -1558,7 +1717,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "@.m_comma = private unnamed_addr constant [3 x i8] c\", \\00\", align 8" + NL^
 
     // --- RUNTIME HELPERS (FIXED: Signed Checks) ---
-    
+
     s -> s + "define i64 @_str_cat(i64 %a, i64 %b) {" + NL^
     s -> s + "  %sa = inttoptr i64 %a to i8*" + NL^
     s -> s + "  %sb = inttoptr i64 %b to i8*" + NL^
@@ -1574,20 +1733,56 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "}" + NL^
 
     s -> s + "define i64 @to_string(i64 %val) {" + NL^
-    s -> s + "  %is_ptr = icmp sgt i64 %val, 4294967296" + NL^
-    s -> s + "  br i1 %is_ptr, label %is_str, label %is_int" + NL^
-    s -> s + "is_str: ret i64 %val" + NL^
-    s -> s + "is_int:" + NL^
-    s -> s + "  %mem = call i64 @malloc(i64 32)" + NL^
-    s -> s + "  %p = inttoptr i64 %mem to i8*" + NL^
-    s -> s + "  %fmt = getelementptr [4 x i8], [4 x i8]* @.fmt_raw_i, i64 0, i64 0" + NL^
-    s -> s + "  call i32 (i8*, i8*, ...) @sprintf(i8* %p, i8* %fmt, i64 %val)" + NL^
-    s -> s + "  ret i64 %mem" + NL^
-    s -> s + "}" + NL^
+        s -> s + "  %is_ptr = icmp sgt i64 %val, " + ptr_thresh + NL^
+        s -> s + "  br i1 %is_ptr, label %is_str, label %is_int" + NL^
+        s -> s + "is_str: ret i64 %val" + NL^
+        s -> s + "is_int:" + NL^
+        s -> s + "  %mem = call i64 @malloc(i64 32)" + NL^
+        s -> s + "  %ptr = inttoptr i64 %mem to i8*" + NL^
+        s -> s + "  %is_zero = icmp eq i64 %val, 0" + NL^
+        s -> s + "  br i1 %is_zero, label %zero, label %calc" + NL^
+        s -> s + "zero:" + NL^
+        s -> s + "  store i8 48, i8* %ptr" + NL^
+        s -> s + "  %zterm = getelementptr i8, i8* %ptr, i64 1" + NL^
+        s -> s + "  store i8 0, i8* %zterm" + NL^
+        s -> s + "  %zret = ptrtoint i8* %ptr to i64" + NL^
+        s -> s + "  ret i64 %zret" + NL^
+        s -> s + "calc:" + NL^
+        s -> s + "  %is_neg = icmp slt i64 %val, 0" + NL^
+        s -> s + "  %neg_val = sub i64 0, %val" + NL^
+        s -> s + "  %abs_val = select i1 %is_neg, i64 %neg_val, i64 %val" + NL^
+        s -> s + "  br label %loop" + NL^
+        s -> s + "loop:" + NL^
+        s -> s + "  %curr = phi i64 [ %abs_val, %calc ], [ %next_val, %loop ]" + NL^
+        s -> s + "  %idx = phi i64 [ 30, %calc ], [ %next_idx, %loop ]" + NL^
+        s -> s + "  %rem = srem i64 %curr, 10" + NL^
+        s -> s + "  %char = add i64 %rem, 48" + NL^
+        s -> s + "  %c8 = trunc i64 %char to i8" + NL^
+        s -> s + "  %slot = getelementptr i8, i8* %ptr, i64 %idx" + NL^
+        s -> s + "  store i8 %c8, i8* %slot" + NL^
+        s -> s + "  %next_val = sdiv i64 %curr, 10" + NL^
+        s -> s + "  %next_idx = sub i64 %idx, 1" + NL^
+        s -> s + "  %stop = icmp eq i64 %next_val, 0" + NL^
+        s -> s + "  br i1 %stop, label %done, label %loop" + NL^
+        s -> s + "done:" + NL^
+        s -> s + "  %start_idx = add i64 %next_idx, 1" + NL^
+        s -> s + "  br i1 %is_neg, label %add_neg, label %copy" + NL^
+        s -> s + "add_neg:" + NL^
+        s -> s + "  %neg_slot = getelementptr i8, i8* %ptr, i64 %next_idx" + NL^
+        s -> s + "  store i8 45, i8* %neg_slot" + NL^
+        s -> s + "  br label %copy" + NL^
+        s -> s + "copy:" + NL^
+        s -> s + "  %final_start = phi i64 [ %start_idx, %done ], [ %next_idx, %add_neg ]" + NL^
+        s -> s + "  %term_slot = getelementptr i8, i8* %ptr, i64 31" + NL^
+        s -> s + "  store i8 0, i8* %term_slot" + NL^
+        s -> s + "  %ret_ptr = getelementptr i8, i8* %ptr, i64 %final_start" + NL^
+        s -> s + "  %ret_int = ptrtoint i8* %ret_ptr to i64" + NL^
+        s -> s + "  ret i64 %ret_int" + NL^
+        s -> s + "}" + NL^
 
     s -> s + "define i64 @_add(i64 %a, i64 %b) {" + NL^
-    s -> s + "  %is_ptr_a = icmp sgt i64 %a, 4294967296" + NL^
-    s -> s + "  %is_ptr_b = icmp sgt i64 %b, 4294967296" + NL^
+    s -> s + "  %is_ptr_a = icmp sgt i64 %a, " + ptr_thresh + NL^
+    s -> s + "  %is_ptr_b = icmp sgt i64 %b, " + ptr_thresh + NL^
     s -> s + "  %both_ptr = and i1 %is_ptr_a, %is_ptr_b" + NL^
     s -> s + "  %any_ptr = or i1 %is_ptr_a, %is_ptr_b" + NL^ // [FIX] If EITHER is a pointer
     s -> s + "  br i1 %both_ptr, label %check_list, label %check_str" + NL^
@@ -1637,7 +1832,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "}" + NL^
 
     s -> s + "define i64 @_append_poly(i64 %list, i64 %val) {" + NL^
-    s -> s + "  %is_ptr = icmp sgt i64 %val, 4294967296" + NL^
+    s -> s + "  %is_ptr = icmp sgt i64 %val, " + ptr_thresh + NL^
     s -> s + "  br i1 %is_ptr, label %check_list, label %push_one" + NL^
     s -> s + "check_list:" + NL^
     s -> s + "  %ptr = inttoptr i64 %val to i8*" + NL^
@@ -1654,11 +1849,11 @@ opus get_llvm_header(is_freestanding, is_arm64) {
 
     s -> s + "define i64 @_eq(i64 %a, i64 %b) {" + NL^
     // [FIX] Use sgt (Signed Greater Than) to handle -1 safely
-    s -> s + "  %a_is_ptr = icmp sgt i64 %a, 4294967296" + NL^
-    s -> s + "  %b_is_ptr = icmp sgt i64 %b, 4294967296" + NL^
+    s -> s + "  %a_is_ptr = icmp sgt i64 %a, " + ptr_thresh + NL^
+    s -> s + "  %b_is_ptr = icmp sgt i64 %b, " + ptr_thresh + NL^
     s -> s + "  %both_ptr = and i1 %a_is_ptr, %b_is_ptr" + NL^
     s -> s + "  br i1 %both_ptr, label %check_null, label %cmp_int" + NL^
-    
+
     // Safety: Don't strcmp NULL (0)
     s -> s + "check_null:" + NL^
     s -> s + "  %a_null = icmp eq i64 %a, 0" + NL^
@@ -1683,11 +1878,11 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "define i64 @_list_new() {" + NL^
     s -> s + "  %mem = call i64 @malloc(i64 24)" + NL^
     s -> s + "  %ptr = inttoptr i64 %mem to i64*" + NL^
-    s -> s + "  store i64 3, i64* %ptr" + NL^ 
+    s -> s + "  store i64 3, i64* %ptr" + NL^
     s -> s + "  %cnt = getelementptr i64, i64* %ptr, i64 1" + NL^
-    s -> s + "  store i64 0, i64* %cnt" + NL^ 
+    s -> s + "  store i64 0, i64* %cnt" + NL^
     s -> s + "  %data = getelementptr i64, i64* %ptr, i64 2" + NL^
-    s -> s + "  store i64 0, i64* %data" + NL^ 
+    s -> s + "  store i64 0, i64* %data" + NL^
     s -> s + "  ret i64 %mem" + NL^
     s -> s + "}" + NL^
 
@@ -1710,14 +1905,14 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  store i64 %new_cnt, i64* %cnt_ptr" + NL^
     s -> s + "  %data_ptr = getelementptr i64, i64* %ptr, i64 2" + NL^
     s -> s + "  %old_mem_i = load i64, i64* %data_ptr" + NL^
-    
+
     // Scale memory exactly to what is needed (O(N) safe growth)
     s -> s + "  %req_bytes = mul i64 %new_cnt, 8" + NL^
     s -> s + "  %old_ptr = inttoptr i64 %old_mem_i to i8*" + NL^
     s -> s + "  %new_ptr = call i8* @realloc(i8* %old_ptr, i64 %req_bytes)" + NL^
     s -> s + "  %new_mem = ptrtoint i8* %new_ptr to i64" + NL^
     s -> s + "  store i64 %new_mem, i64* %data_ptr" + NL^
-    
+
     s -> s + "  %base_ptr = inttoptr i64 %new_mem to i64*" + NL^
     s -> s + "  %idx = getelementptr i64, i64* %base_ptr, i64 %cnt" + NL^
     s -> s + "  store i64 %v, i64* %idx" + NL^
@@ -1727,7 +1922,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "define i64 @_map_new() {" + NL^
     s -> s + "  %m = call i64 @_list_new()" + NL^
     s -> s + "  %ptr = inttoptr i64 %m to i64*" + NL^
-    s -> s + "  store i64 4, i64* %ptr" + NL^ 
+    s -> s + "  store i64 4, i64* %ptr" + NL^
     s -> s + "  ret i64 %m" + NL^
     s -> s + "}" + NL^
 
@@ -1761,7 +1956,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %base = load i64, i64* %data_ptr" + NL^
     s -> s + "  %base_ptr = inttoptr i64 %base to i64*" + NL^
     s -> s + "  %key_s = inttoptr i64 %key to i8*" + NL^
-    
+
     // Start at end of list (cnt - 2)
     s -> s + "  %start_i = sub i64 %cnt, 2" + NL^
     s -> s + "  br label %loop" + NL^
@@ -1769,7 +1964,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %i = phi i64 [ %start_i, %0 ], [ %next_i, %next ]" + NL^
     s -> s + "  %cond = icmp sge i64 %i, 0" + NL^
     s -> s + "  br i1 %cond, label %check_key, label %not_found" + NL^
-    
+
     s -> s + "check_key:" + NL^
     s -> s + "  %k_slot = getelementptr i64, i64* %base_ptr, i64 %i" + NL^
     s -> s + "  %k_val = load i64, i64* %k_slot" + NL^
@@ -1777,17 +1972,17 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %cmp = call i32 @strcmp(i8* %k_str, i8* %key_s)" + NL^
     s -> s + "  %match = icmp eq i32 %cmp, 0" + NL^
     s -> s + "  br i1 %match, label %found, label %next" + NL^
-    
+
     s -> s + "next:" + NL^
     s -> s + "  %next_i = sub i64 %i, 2" + NL^
     s -> s + "  br label %loop" + NL^
-    
+
     s -> s + "found:" + NL^
     s -> s + "  %v_idx = add i64 %i, 1" + NL^
     s -> s + "  %v_slot = getelementptr i64, i64* %base_ptr, i64 %v_idx" + NL^
     s -> s + "  %ret = load i64, i64* %v_slot" + NL^
     s -> s + "  ret i64 %ret" + NL^
-    
+
     s -> s + "not_found:" + NL^
     s -> s + "  ret i64 0" + NL^
     s -> s + "}" + NL^
@@ -1827,11 +2022,11 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  ret i64 %val" + NL^
     s -> s + "err: ret i64 0" + NL^
     s -> s + "}" + NL^
-
+si (is_freestanding == 0) {
     s -> s + "define i64 @_get_argv(i64 %idx) {" + NL^
     s -> s + "  %argc = load i32, i32* @__sys_argc" + NL^
     s -> s + "  %argc64 = sext i32 %argc to i64" + NL^
-    
+
     // Bounds check to prevent out-of-bounds argument crashing
     s -> s + "  %is_oob = icmp sge i64 %idx, %argc64" + NL^
     s -> s + "  br i1 %is_oob, label %err, label %ok" + NL^
@@ -1840,7 +2035,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %emp_p = inttoptr i64 %emp to i8*" + NL^
     s -> s + "  store i8 0, i8* %emp_p" + NL^
     s -> s + "  ret i64 %emp" + NL^
-    
+
     s -> s + "ok:" + NL^
     s -> s + "  %argv = load i8**, i8*** @__sys_argv" + NL^
     s -> s + "  %ptr = getelementptr i8*, i8** %argv, i64 %idx" + NL^
@@ -1885,103 +2080,103 @@ opus get_llvm_header(is_freestanding, is_arm64) {
 
     s -> s + "define i64 @print_any(i64 %val) {" + NL^
     s -> s + "entry:" + NL^
-    s -> s + "  %is_ptr = icmp sgt i64 %val, 4294967296" + NL^
+    s -> s + "  %is_ptr = icmp sgt i64 %val, " + ptr_thresh + NL^
     s -> s + "  br i1 %is_ptr, label %check_obj, label %print_int" + NL^
-    
+
     s -> s + "check_obj:" + NL^
     s -> s + "  %ptr8 = inttoptr i64 %val to i8*" + NL^
     s -> s + "  %tag = load i8, i8* %ptr8" + NL^
-    s -> s + "  %is_list = icmp eq i8 %tag, 3" + NL^ 
+    s -> s + "  %is_list = icmp eq i8 %tag, 3" + NL^
     s -> s + "  br i1 %is_list, label %print_list, label %print_str" + NL^
-    
+
     s -> s + "print_list:" + NL^
     s -> s + "  %f_s1 = getelementptr [3 x i8], [3 x i8]* @.fmt_raw_s, i64 0, i64 0" + NL^
     s -> s + "  %b_l = getelementptr [2 x i8], [2 x i8]* @.m_brk_l, i64 0, i64 0" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_s1, i8* %b_l)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
-    
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
+
     s -> s + "  %ptr64 = inttoptr i64 %val to i64*" + NL^ // <-- EXPLICIT CAST
     s -> s + "  %cnt_ptr = getelementptr i64, i64* %ptr64, i64 1" + NL^
     s -> s + "  %cnt = load i64, i64* %cnt_ptr" + NL^
     s -> s + "  %is_empty = icmp eq i64 %cnt, 0" + NL^
     s -> s + "  br i1 %is_empty, label %done, label %setup_loop" + NL^
-    
+
     s -> s + "setup_loop:" + NL^
     s -> s + "  %data_ptr = getelementptr i64, i64* %ptr64, i64 2" + NL^
     s -> s + "  %base = load i64, i64* %data_ptr" + NL^
     s -> s + "  %base_ptr = inttoptr i64 %base to i64*" + NL^
     s -> s + "  br label %loop" + NL^
-    
+
     s -> s + "loop:" + NL^
     s -> s + "  %i = phi i64 [ 0, %setup_loop ], [ %next_i, %loop_end ]" + NL^
     s -> s + "  %cond = icmp slt i64 %i, %cnt" + NL^
     s -> s + "  br i1 %cond, label %body, label %done" + NL^
-    
+
     s -> s + "body:" + NL^
     s -> s + "  %not_first = icmp ne i64 %i, 0" + NL^
     s -> s + "  br i1 %not_first, label %comma, label %val_print" + NL^
-    
+
     s -> s + "comma:" + NL^
     s -> s + "  %f_s2 = getelementptr [3 x i8], [3 x i8]* @.fmt_raw_s, i64 0, i64 0" + NL^
     s -> s + "  %com = getelementptr [3 x i8], [3 x i8]* @.m_comma, i64 0, i64 0" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_s2, i8* %com)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  br label %val_print" + NL^
-    
+
     s -> s + "val_print:" + NL^
     s -> s + "  %slot = getelementptr i64, i64* %base_ptr, i64 %i" + NL^
     s -> s + "  %v = load i64, i64* %slot" + NL^
-    s -> s + "  %v_is_ptr = icmp sgt i64 %v, 4294967296" + NL^
+    s -> s + "  %v_is_ptr = icmp sgt i64 %v, " + ptr_thresh + NL^
     s -> s + "  br i1 %v_is_ptr, label %v_ptr_check, label %v_int" + NL^
-    
+
     s -> s + "v_ptr_check:" + NL^
     s -> s + "  %vs_ptr8 = inttoptr i64 %v to i8*" + NL^ // <-- NESTED SEGFAULT FIX
     s -> s + "  %in_tag = load i8, i8* %vs_ptr8" + NL^
-    s -> s + "  %in_is_list = icmp eq i8 %in_tag, 3" + NL^ 
+    s -> s + "  %in_is_list = icmp eq i8 %in_tag, 3" + NL^
     s -> s + "  br i1 %in_is_list, label %v_nested, label %v_raw_str" + NL^
 
     s -> s + "v_nested:" + NL^
-    s -> s + "  call i64 @print_any(i64 %v)" + NL^ 
+    s -> s + "  call i64 @print_any(i64 %v)" + NL^
     s -> s + "  br label %loop_end" + NL^
 
     s -> s + "v_raw_str:" + NL^
     s -> s + "  %f_s3 = getelementptr [3 x i8], [3 x i8]* @.fmt_raw_s, i64 0, i64 0" + NL^
     s -> s + "  %vs_str = inttoptr i64 %v to i8*" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_s3, i8* %vs_str)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  br label %loop_end" + NL^
-    
+
     s -> s + "v_int:" + NL^
     s -> s + "  %f_i = getelementptr [4 x i8], [4 x i8]* @.fmt_raw_i, i64 0, i64 0" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_i, i64 %v)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  br label %loop_end" + NL^
-    
+
     s -> s + "loop_end:" + NL^
     s -> s + "  %next_i = add i64 %i, 1" + NL^
     s -> s + "  br label %loop" + NL^
-    
+
     s -> s + "done:" + NL^
     s -> s + "  %f_s4 = getelementptr [3 x i8], [3 x i8]* @.fmt_raw_s, i64 0, i64 0" + NL^
     s -> s + "  %b_r = getelementptr [3 x i8], [3 x i8]* @.m_brk_r, i64 0, i64 0" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_s4, i8* %b_r)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  ret i64 0" + NL^
-    
+
     s -> s + "print_int:" + NL^
     s -> s + "  %f_i_end = getelementptr [5 x i8], [5 x i8]* @.fmt_int, i64 0, i64 0" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_i_end, i64 %val)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  ret i64 0" + NL^
-    
+
     s -> s + "print_str:" + NL^
     s -> s + "  %f_s_end = getelementptr [4 x i8], [4 x i8]* @.fmt_str, i64 0, i64 0" + NL^
     s -> s + "  %str_p = inttoptr i64 %val to i8*" + NL^
     s -> s + "  call i32 (i8*, ...) @printf(i8* %f_s_end, i8* %str_p)" + NL^
-    s -> s + "  call i32 @fflush(i8* null)" + NL^ 
+    s -> s + "  call i32 @fflush(i8* null)" + NL^
     s -> s + "  ret i64 0" + NL^
     s -> s + "}" + NL^
-
+}
     s -> s + "define i64 @codex(i64 %val) {" + NL^
     s -> s + "  %ptr = inttoptr i64 %val to i8*" + NL^
     s -> s + "  %c = load i8, i8* %ptr" + NL^
@@ -1992,7 +2187,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "define i64 @pars(i64 %str, i64 %start, i64 %len) {" + NL^
     s -> s + "  %src = inttoptr i64 %str to i8*" + NL^
     s -> s + "  %slen = call i64 @strlen(i8* %src)" + NL^
-    
+
     // Check if start is past EOF
     s -> s + "  %is_oob = icmp sge i64 %start, %slen" + NL^
     s -> s + "  br i1 %is_oob, label %oob, label %ok" + NL^
@@ -2001,13 +2196,13 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %emp_p = inttoptr i64 %emp to i8*" + NL^
     s -> s + "  store i8 0, i8* %emp_p" + NL^
     s -> s + "  ret i64 %emp" + NL^
-    
+
     // Safely clamp length to prevent reading into unmapped hardware memory
     s -> s + "ok:" + NL^
     s -> s + "  %rem = sub i64 %slen, %start" + NL^
     s -> s + "  %is_long = icmp sgt i64 %len, %rem" + NL^
     s -> s + "  %safe_len = select i1 %is_long, i64 %rem, i64 %len" + NL^
-    
+
     s -> s + "  %src_off = getelementptr i8, i8* %src, i64 %start" + NL^
     s -> s + "  %alloc_sz = add i64 %safe_len, 1" + NL^
     s -> s + "  %dest = call i64 @malloc(i64 %alloc_sz)" + NL^
@@ -2050,7 +2245,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  %len = call i64 @strlen(i8* %str_ptr)" + NL^
     s -> s + "  ret i64 %len" + NL^
     s -> s + "}" + NL^
-
+si (is_freestanding == 0) {
     s -> s + "define i64 @capio() {" + NL^
     s -> s + "  %mem = call i64 @malloc(i64 4096)" + NL^
     s -> s + "  %ptr = inttoptr i64 %mem to i8*" + NL^
@@ -2133,7 +2328,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "done:" + NL^
     s -> s + "  ret i64 %list" + NL^
     s -> s + "}" + NL^
-
+}
     s -> s + "define i64 @iunctura(i64 %list_ptr, i64 %delim) {" + NL^
     s -> s + "  %is_null = icmp eq i64 %list_ptr, 0" + NL^
     s -> s + "  br i1 %is_null, label %ret_empty, label %check" + NL^
@@ -2182,7 +2377,7 @@ opus get_llvm_header(is_freestanding, is_arm64) {
     s -> s + "  ret i64 %curr_str" + NL^
     s -> s + "}" + NL^
 
-    
+
 
     // ==========================================
     // --- ACHLYS BARE-METAL OS LAYER ---
@@ -2305,11 +2500,11 @@ opus expand_imports(stmts) {
 
 opus main() {
     scribo("⚔️  ACHLYS -> LLVM COMPILER (STAGE 1.8.4 - FREESTANDING)")^
-    
+
     init_constants()^
     global_tokens -> []^
     p_pos -> 0^
-    
+
     vas is_freestanding : int -> 0^
     vas is_arm64 : int -> 0^
     vas arg_idx : int -> 1^
@@ -2320,11 +2515,11 @@ opus main() {
     dum (1) {
         arg -> capere_argumentum(arg_idx)^
         si (mensura(arg) == 0) { abrumpere^ }
-        
+
         si (arg == "--freestanding") { is_freestanding -> 1^ }
         aliter { si (arg == "--arm64") { is_arm64 -> 1^ }
         aliter { filename -> arg^ } }
-        
+
         arg_idx -> arg_idx + 1^
     }
 
@@ -2335,7 +2530,7 @@ opus main() {
 
     si (valid) {
         vas src : str -> revelare(filename)^
-        
+
         si (mensura(src) == 0) {
             scribo("⚠️  File not found: " + filename)^
         } aliter {
@@ -2343,19 +2538,19 @@ opus main() {
             global_tokens -> lex_source(src)^
             vas token_count : int -> mensura(global_tokens)^
             scribo("[DEBUG] Main sees " + int_to_str(token_count) + " tokens.")^
-            
+
             vas k : int -> 0^
             dum (k < token_count) {
                 vas t : obj -> global_tokens[k]^
                 scribo(" T[" + int_to_str(k) + "]: " + t["text"] + " (" + int_to_str(t["type"]) + ")")^
                 k -> k + 1^
             }
-            
+
             scribo("[2/3] Parsing...")^
             use_huge_lists -> 1^
             vas stmts : arr -> []^
             use_huge_lists -> 0^
-            
+
             vas pt : obj -> peek()^
             dum (pt["type"] != TOK_EOF) {
                 si (has_error) { abrumpere^ }
@@ -2363,60 +2558,64 @@ opus main() {
                 stmts << parse_stmt()^
                 pt -> peek()^
             }
-            
+
             // [FIX] Expand imports AFTER parsing the main file!
             vas flat_stmts : arr -> expand_imports(stmts)^
-            
+
             si (has_error) {
                 scribo("❌ Compilation Failed.")^
             } aliter {
                 scribo("[3/3] Generating LLVM IR...")^
-          
+
                 vas header : str -> get_llvm_header(is_freestanding, is_arm64)^
                 vas top_level : arr -> []^
                 vas i : int -> 0^
-                
+
                 // [FIX] Iterate over flat_stmts, not stmts!
                 dum (i < mensura(flat_stmts)) {
                     vas s : obj -> flat_stmts[i]^
-                    
+
                     // 1. FUNCTIONS
                     si (s["type"] == STMT_FUNC) {
-                        compile_func(s)^ 
-                    } 
+                        compile_func(s)^
+                    }
                     // 2. GLOBALS (Shared/Const/Let at top level)
                     aliter { si (s["type"] == STMT_SHARED vel s["type"] == STMT_CONST) {
                          // Define Global: @name = global i64 0
                          vas g_name : str -> "@" + s["name"]^
                          out_data -> out_data + g_name + " = global i64 0" + signum_ex(10)^
                          global_map[s["name"]] -> g_name^
-                         
+
                          // Convert Declaration to Assignment for @main execution
                          // communis x -> 10  becomes  x = 10 inside @main
                          vas assign : obj -> { "type": STMT_ASSIGN, "name": s["name"], "val": s["val"] }^
                          top_level << assign^
-                    } 
+                    }
                     // 3. TOP LEVEL CODE
                     aliter {
                          top_level << s^
                     } }
                     i -> i + 1^
                 }
-                
+
                 // GENERATE @main
                 vas NL : str -> signum_ex(10)^
-                emit_raw("define i32 @main(i32 %argc, i8** %argv) {")^
-                emit_raw("  store i32 %argc, i32* @__sys_argc")^
-                emit_raw("  store i8** %argv, i8*** @__sys_argv")^
-                
-                vas boot_msg : str -> add_global_string(">> EXECUTING <<")^
-                emit_raw("  %boot_msg_ptr = getelementptr [22 x i8], [22 x i8]* " + boot_msg + ", i64 0, i64 0")^
-                emit_raw("  %boot_msg_int = ptrtoint i8* %boot_msg_ptr to i64")^
-                emit_raw("  call i64 @print_any(i64 %boot_msg_int)")^
+            si (is_freestanding == 0) {
+                    emit_raw("define i32 @main(i32 %argc, i8** %argv) {")^
+                    emit_raw("  store i32 %argc, i32* @__sys_argc")^
+                    emit_raw("  store i8** %argv, i8*** @__sys_argv")^
+                    vas boot_msg : str -> add_global_string(">> EXECUTING <<")^
+                    emit_raw("  %boot_msg_ptr = getelementptr [22 x i8], [22 x i8]* " + boot_msg + ", i64 0, i64 0")^
+                    emit_raw("  %boot_msg_int = ptrtoint i8* %boot_msg_ptr to i64")^
+                    emit_raw("  call i64 @print_any(i64 %boot_msg_int)")^
+                } aliter {
+                    // [OS BARE METAL] Hardware Initialization Entry
+                    emit_raw("define void @_achlys_init() {")^
+                }
 
                 reg_count -> 0^
                 var_map -> {}^
-                
+
                 // [DEBUG] Check statement count
                 scribo("[DEBUG] Top Level Statements: " + int_to_str(mensura(top_level)))^
 
@@ -2425,10 +2624,16 @@ opus main() {
                     compile_stmt(top_level[i])^
                     i -> i + 1^
                 }
-                
-                emit("ret i32 0")^
-                emit_raw("}")^
-                
+
+                si (is_freestanding == 0) {
+                    emit("ret i32 0")^
+                    emit_raw("}")^
+                } aliter {
+                    // [OS BARE METAL] Jump to Kernel Main
+                    emit("  %os_res = call i64 @achlys_main()")^
+                    emit("  ret void")^
+                    emit_raw("}")^
+                }
                 vas final_ir : str -> header + out_data + out_code^
                 inscribo("Achlys.ll", final_ir)^
                 scribo("✅ SUCCESS. 'Achlys.ll' generated.")^
