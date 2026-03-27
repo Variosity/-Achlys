@@ -1210,12 +1210,48 @@ opus compile_expr(node) {
         si (name == "sys") { name -> "imperium"^ }
 
         // [FIX] OS BARE METAL PRIMITIVES
+        // [OS BARE METAL] CPU Hardware Memory Fence (Stops Out-Of-Order Execution)
+        si (name == "cpu_fence") {
+            emit("call void asm sideeffect \"mfence\", \"~{memory}\"()")^
+            reddo "0"^
+        }
+        // [OS BARE METAL] Atomic Checksum Fold
+        si (name == "fold_checksum") {
+            vas sum_reg : str -> compile_expr(node["args"][0])^
+            
+            // First Fold
+            vas hi1 : str -> next_reg()^
+            emit(hi1 + " = lshr i64 " + sum_reg + ", 16")^
+            vas lo1 : str -> next_reg()^
+            emit(lo1 + " = and i64 " + sum_reg + ", 65535")^
+            vas fold1 : str -> next_reg()^
+            emit(fold1 + " = add i64 " + hi1 + ", " + lo1)^
+            
+            // Second Fold
+            vas hi2 : str -> next_reg()^
+            emit(hi2 + " = lshr i64 " + fold1 + ", 16")^
+            vas lo2 : str -> next_reg()^
+            emit(lo2 + " = and i64 " + fold1 + ", 65535")^
+            vas fold2 : str -> next_reg()^
+            emit(fold2 + " = add i64 " + hi2 + ", " + lo2)^
+            
+            // Invert
+            vas inv : str -> next_reg()^
+            emit(inv + " = xor i64 " + fold2 + ", 65535")^
+            vas res : str -> next_reg()^
+            emit(res + " = and i64 " + inv + ", 65535")^
+            
+            reddo res^
+        }
         si (name == "scrutari") {
             vas addr_reg : str -> compile_expr(node["args"][0])^
             vas ptr_reg : str -> next_reg()^
             emit(ptr_reg + " = inttoptr i64 " + addr_reg + " to ptr")^
             vas val_reg : str -> next_reg()^
-            emit(val_reg + " = load i8, ptr " + ptr_reg)^
+            
+            // [CRITICAL COMPILER FIX] Add 'volatile' so LLVM cannot hoist reads above stores!
+            emit(val_reg + " = load volatile i8, ptr " + ptr_reg)^ 
+            
             vas mem_res : str -> next_reg()^
             emit(mem_res + " = zext i8 " + val_reg + " to i64")^
             reddo mem_res^
@@ -2499,7 +2535,7 @@ opus expand_imports(stmts) {
 // ============================================================================
 
 opus main() {
-    scribo("⚔️  ACHLYS -> LLVM COMPILER (STAGE 1.8.4 - FREESTANDING)")^
+    scribo("⚔️  ACHLYS -> LLVM COMPILER (STAGE 1.8.6 - FREESTANDING)")^
 
     init_constants()^
     global_tokens -> []^
@@ -2524,7 +2560,7 @@ opus main() {
     }
 
     si (mensura(filename) == 0) {
-        scribo("Usage: ./mate <file.nox> [--freestanding] [--arm64]")^
+        scribo("Usage: achlys <file.nox> [--freestanding] [--arm64]")^
         valid -> 0^
     }
 
