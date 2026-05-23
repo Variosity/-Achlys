@@ -1,6 +1,6 @@
 # -Achlys
 
-ACHLYS - THE OUROBOROS AWAKENS
+Achlys - The Ouroboros Awakens
 
 
 > **"Achlys is the first programming language designed specifically for security professionals."**
