@@ -1,6 +1,6 @@
 # Achlys
 
-**A systems programming language built for security professionals, native performance, and zero-dependency distribution.**
+**A systems programming language, native performance, and zero-dependency distribution.**
 
 ---
 
@@ -57,7 +57,7 @@ One file. No dependencies. Runs on any compatible system. This makes Achlys-buil
 - Custom exploit frameworks and proof-of-concept utilities
 - Packet crafters and protocol fuzzers
 - HTTP servers and reverse proxies
-- GUI security dashboards (via Raylib)
+- GUI  dashboards (via Raylib)
 - System utilities and automation scripts
 - 2D/3D games and simulations
 - Bare-metal OS components
